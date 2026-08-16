@@ -92,7 +92,7 @@ final class ExampleGenerator
         }
 
         for ($attempt = 0; $attempt < self::MAX_NODE_RETRIES; $attempt++) {
-            $operator = $this->config->operators[$this->rng->int(0, count($this->config->operators) - 1)];
+            $operator = $this->pickWeightedOperator();
             $remaining = $opsBudget - 1;
             $leftBudget = $this->rng->int(0, $remaining);
             $rightBudget = $remaining - $leftBudget;
@@ -130,6 +130,41 @@ final class ExampleGenerator
         throw new RetryExhaustedException("Nelze rozložit hodnotu {$target} na {$opsBudget} operací.");
     }
 
+    /**
+     * Vážený výběr operátoru podle GeneratorConfig::operatorWeights (ruletové kolo).
+     * Když vyjde součet vah 0 (např. uživatel dá všem povoleným operátorům váhu 0),
+     * spadne se zpět na rovnoměrný výběr, ať generování nezůstane bez operátoru.
+     */
+    private function pickWeightedOperator(): Operator
+    {
+        $operators = $this->config->operators;
+        $weights = array_map(fn(Operator $op) => $this->config->operatorWeight($op), $operators);
+        $total = array_sum($weights);
+
+        if ($total <= 0) {
+            return $operators[$this->rng->int(0, count($operators) - 1)];
+        }
+
+        $roll = $this->rng->int(1, $total);
+        $cumulative = 0;
+        foreach ($operators as $i => $op) {
+            $cumulative += $weights[$i];
+            if ($roll <= $cumulative) {
+                return $op;
+            }
+        }
+
+        return $operators[count($operators) - 1];
+    }
+
+    /** Náhodné číslo z rozsahu — s bias na počet cifer, nebo čistě uniformní, podle configu. */
+    private function pickRangedInt(int $min, int $max): int
+    {
+        return $this->config->digitCountBiasEnabled
+            ? $this->rng->intBiasedByDigits($min, $max)
+            : $this->rng->int($min, $max);
+    }
+
     /** @return array{0:int,1:int} */
     private function pickOperands(Operator $operator, int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
     {
@@ -161,8 +196,8 @@ final class ExampleGenerator
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
             $a = $useFullRange
-                ? $this->rng->intBiasedByDigits($lowA, $highA)
-                : $this->rng->intBiasedByDigits($lowA, $preferredHighA);
+                ? $this->pickRangedInt($lowA, $highA)
+                : $this->pickRangedInt($lowA, $preferredHighA);
             $b = $target - $a;
             if ($leftIsLeaf && $a === 0) {
                 continue;
@@ -194,8 +229,8 @@ final class ExampleGenerator
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
             $b = $useFullRange
-                ? $this->rng->intBiasedByDigits($lowB, $highB)
-                : $this->rng->intBiasedByDigits($preferredLowB, $highB);
+                ? $this->pickRangedInt($lowB, $highB)
+                : $this->pickRangedInt($preferredLowB, $highB);
             $a = $target + $b;
             if ($leftIsLeaf && $a === 0) {
                 continue;
@@ -278,7 +313,7 @@ final class ExampleGenerator
         $scale = $this->scale;
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $b = $this->rng->intBiasedByDigits($this->scaledMin, $this->scaledMax);
+            $b = $this->pickRangedInt($this->scaledMin, $this->scaledMax);
             if ($b === 0 || $b === $scale) {
                 continue; // dělitel nesmí být 0 ani "1" (-1 povoleno, ale omezeně, viz níže)
             }
@@ -341,7 +376,7 @@ final class ExampleGenerator
     private function randomValue(int $min, int $max, bool $allowZero): int
     {
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $v = $this->rng->intBiasedByDigits($min, $max);
+            $v = $this->pickRangedInt($min, $max);
             if ($allowZero || $v !== 0) {
                 return $v;
             }

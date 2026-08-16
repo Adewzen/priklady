@@ -63,6 +63,13 @@ $seed = $useSeed
 $includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : true;
 $doubleNegativeBiasPercent = max(0, min(100, readInt($input, 'double_negative_bias', 70)));
 $maxNegativeOneFactors = max(0, min(5, readInt($input, 'max_negative_one_factors', 1)));
+$digitCountBiasEnabled = $submitted ? readBool($input, 'digit_count_bias') : true;
+
+$operatorWeightKeys = ['add' => 'weight_add', 'sub' => 'weight_sub', 'mul' => 'weight_mul', 'div' => 'weight_div'];
+$operatorWeights = [];
+foreach ($operatorWeightKeys as $opValue => $fieldName) {
+    $operatorWeights[$opValue] = max(0, min(100, readInt($input, $fieldName, 50)));
+}
 
 $config = new GeneratorConfig(
     count: $count,
@@ -79,6 +86,8 @@ $config = new GeneratorConfig(
     seed: $seed,
     doubleNegativeBiasPercent: $doubleNegativeBiasPercent,
     maxNegativeOneFactors: $maxNegativeOneFactors,
+    digitCountBiasEnabled: $digitCountBiasEnabled,
+    operatorWeights: $operatorWeights,
 );
 
 $priorityParensWarning = $submitted
@@ -106,6 +115,14 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
     if ($config->allowNegative) {
         $parts[] = 'Bias proti dvojitým znaménkům: ' . $config->doubleNegativeBiasPercent . ' %';
         $parts[] = 'Max. počet "-1" jako činitele: ' . $config->maxNegativeOneFactors;
+    }
+    $parts[] = 'Bias na počet cifer: ' . ($config->digitCountBiasEnabled ? 'ano' : 'ne');
+    if (count($config->operators) > 1) {
+        $weights = [];
+        foreach ($config->operators as $op) {
+            $weights[] = $op->symbol() . ':' . $config->operatorWeight($op);
+        }
+        $parts[] = 'Váhy operátorů: ' . implode(', ', $weights);
     }
     return implode(' · ', $parts);
 }
@@ -209,6 +226,25 @@ if ($submitted) {
         <label>Max. počet "-1" jako činitele/dělitele v jednom příkladu (víc za sebou se ruší)
           <input type="number" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
         </label>
+        <label>
+          <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
+          Vyrovnat zastoupení počtu cifer (jinak čistě uniformní rozsah, u širokých rozsahů silně upřednostní nejdelší čísla)
+        </label>
+        <label>Pravděpodobnost jednotlivých operátorů (0–100, normalizuje se mezi povolenými)</label>
+        <div class="row">
+          <label>+
+            <input type="number" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+          </label>
+          <label>−
+            <input type="number" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+          </label>
+          <label>×
+            <input type="number" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
+          </label>
+          <label>÷
+            <input type="number" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+          </label>
+        </div>
       </fieldset>
 
       <fieldset>

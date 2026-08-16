@@ -24,6 +24,15 @@ final class GeneratorConfig
         public readonly int $doubleNegativeBiasPercent = 70,
         /** Kolikrát smí "-1" vystupovat jako činitel/dělitel v jednom příkladu (víc -1 za sebou se navzájem ruší — triviální). */
         public readonly int $maxNegativeOneFactors = 1,
+        /** Vyrovnat zastoupení počtu cifer místo čistě uniformního losování ze spojitého rozsahu (viz Rng::intBiasedByDigits). */
+        public readonly bool $digitCountBiasEnabled = true,
+        /**
+         * Váhy 0–100 pro výběr operátoru, klíč je Operator::value. Chybějící/nulová
+         * váha u POVOLENÉHO operátoru ho jen znevýhodní (ne úplně vyloučí, pokud by
+         * součet vah vyšel 0 — pak se spadne zpět na rovnoměrné rozdělení).
+         * @var array<string,int>
+         */
+        public readonly array $operatorWeights = [],
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
@@ -46,6 +55,17 @@ final class GeneratorConfig
         if ($maxNegativeOneFactors < 0) {
             throw new \InvalidArgumentException('Maximální počet -1 jako činitele nesmí být záporný.');
         }
+        foreach ($operatorWeights as $weight) {
+            if ($weight < 0 || $weight > 100) {
+                throw new \InvalidArgumentException('Váha operátoru musí být 0 až 100.');
+            }
+        }
+    }
+
+    /** Váha operátoru pro vážený výběr (viz ExampleGenerator::pickWeightedOperator). Výchozí 1, pokud není nastavená. */
+    public function operatorWeight(Operator $operator): int
+    {
+        return max(0, $this->operatorWeights[$operator->value] ?? 1);
     }
 
     /** Škálovací faktor pro převod na celá čísla (10^desetinná místa), 1 pokud jsou desetinná čísla vypnutá. */

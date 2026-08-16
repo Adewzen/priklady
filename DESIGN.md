@@ -203,6 +203,24 @@ každé rozhodnutí při stavbě stromu, ne na finální listy nezávisle) — a
 38 % trojciferných, 7 % čtyřciferných (počítáno včetně hraničního `1000`). Výrazně
 vyrovnanější než čistě uniformní rozdělení.
 
+Jde vypnout checkboxem "Vyrovnat zastoupení počtu cifer" v sekci "Pokročilé"
+(`GeneratorConfig::digitCountBiasEnabled`, výchozí zapnuto) — `ExampleGenerator::
+pickRangedInt()` pak přepíná mezi `Rng::intBiasedByDigits()` a obyčejným `Rng::int()`.
+
+## Váhy operátorů
+
+`GeneratorConfig::operatorWeights` (pole `Operator::value => 0-100`, ve formuláři čtyři
+pole v sekci "Pokročilé", výchozí 50 pro každý) řídí pravděpodobnost výběru operátoru
+v `ExampleGenerator::pickWeightedOperator()` — ruletové kolo přes váhy POVOLENÝCH
+operátorů (váha operátoru, který není v `operators`, se nikdy nepoužije). Nejde o
+tvrdý poměr v hotových příkladech (počet operátorů je diskrétní na uzel, ne spojitá
+veličina), ale o pravděpodobnost při KAŽDÉM výběru operátoru — ověřeno testem (váhy
+90/10/0/0 pro +/−/×/÷ daly na 300 příkladech skutečný poměr 90,3 % / 9,7 %).
+
+Okrajový případ: pokud součet vah všech POVOLENÝCH operátorů vyjde 0 (uživatel dá
+všem povoleným operátorům váhu 0), spadne se zpět na rovnoměrný výběr mezi nimi —
+jinak by generování nemělo operátor k výběru. Ověřeno testem.
+
 ## Známé zjednodušení / TODO na příště
 
 - **Variabilní počet operací**: teď je pevný podle zadání, ne rozsah/náhoda.
