@@ -203,7 +203,13 @@ if ($submitted) {
       <?php if ($showResults): ?>
         <p class="results-block">
           <strong>Výsledky:</strong>
-          <?= htmlspecialchars(implode(', ', array_map(fn($e) => $serializer->renderValue($e), $examples))) ?>
+          <?php
+            $numbered = [];
+            foreach ($examples as $i => $example) {
+                $numbered[] = ($i + 1) . '. ' . $serializer->renderValue($example);
+            }
+          ?>
+          <?= htmlspecialchars(implode(', ', $numbered)) ?>
         </p>
       <?php endif; ?>
     <?php elseif ($errorMessage !== null): ?>
