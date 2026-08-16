@@ -8,6 +8,7 @@ use Priklady\Operator;
 use Priklady\GeneratorConfig;
 use Priklady\Rng;
 use Priklady\ExampleGenerator;
+use Priklady\SmallMultiplicationTableGenerator;
 use Priklady\Serializer;
 use Priklady\GenerationFailedException;
 
@@ -71,6 +72,20 @@ foreach ($operatorWeightKeys as $opValue => $fieldName) {
     $operatorWeights[$opValue] = max(0, min(100, readInt($input, $fieldName, 50)));
 }
 
+$smallMultiplicationTable = readBool($input, 'small_multiplication_table');
+$smtIncludeMul = $submitted ? readBool($input, 'smt_mul') : true;
+$smtIncludeDiv = $submitted ? readBool($input, 'smt_div') : true;
+$smtOperators = [];
+if ($smtIncludeMul) {
+    $smtOperators[] = Operator::Mul;
+}
+if ($smtIncludeDiv) {
+    $smtOperators[] = Operator::Div;
+}
+if ($smtOperators === []) {
+    $smtOperators = [Operator::Mul, Operator::Div];
+}
+
 $config = new GeneratorConfig(
     count: $count,
     operationsCount: $operationsCount,
@@ -91,11 +106,32 @@ $config = new GeneratorConfig(
 );
 
 $priorityParensWarning = $submitted
+    && !$smallMultiplicationTable
     && !$allowOperatorPriority
     && !$allowParentheses
     && $config->usesMultiplePrecedenceClasses();
 
-$serializer = new Serializer($config);
+// Malá násobilka má vlastní jednoduchý generátor (jiný rozsah pro činitele než pro
+// výsledek, viz SmallMultiplicationTableGenerator) — Serializer ale pořád potřebuje
+// nějaký GeneratorConfig, tak mu dáme "neutrální" verzi (celá čísla, žádné závorky).
+$serializerConfig = $smallMultiplicationTable
+    ? new GeneratorConfig(
+        count: $count,
+        operationsCount: 1,
+        min: 1,
+        max: 100,
+        operators: $smtOperators,
+        allowDecimals: false,
+        decimalPlaces: 0,
+        allowNegative: false,
+        allowParentheses: false,
+        allowOperatorPriority: false,
+        showResults: $showResults,
+        seed: $seed,
+    )
+    : $config;
+
+$serializer = new Serializer($serializerConfig);
 $examples = [];
 $errorMessage = null;
 
@@ -127,10 +163,25 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
     return implode(' · ', $parts);
 }
 
+function formatSmtSummary(array $operators, int $seed): string
+{
+    $parts = [
+        'Seed: ' . $seed,
+        'Malá násobilka (činitelé 1–10)',
+        'Operace: ' . implode(', ', array_map(fn($op) => $op->symbol(), $operators)),
+    ];
+    return implode(' · ', $parts);
+}
+
 if ($submitted) {
     try {
-        $generator = new ExampleGenerator($config, new Rng($seed));
-        $examples = $generator->generateBatch();
+        if ($smallMultiplicationTable) {
+            $generator = new SmallMultiplicationTableGenerator($count, $smtOperators, new Rng($seed));
+            $examples = $generator->generateBatch();
+        } else {
+            $generator = new ExampleGenerator($config, new Rng($seed));
+            $examples = $generator->generateBatch();
+        }
     } catch (GenerationFailedException $e) {
         $errorMessage = $e->getMessage();
     }
@@ -163,6 +214,7 @@ if ($submitted) {
   .results-block { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #ccc; color: #555; }
   .seed-rule { margin-top: 1.5rem; border: none; border-top: 1px solid #ddd; }
   .seed-info { color: #999; font-size: 0.8rem; margin: 0.5rem 0 0; }
+  .hint { color: #777; font-size: 0.8rem; margin: 0.35rem 0 0; }
   .print-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
   .print-actions button { padding: 0.4rem 0.9rem; }
 
@@ -179,6 +231,19 @@ if ($submitted) {
 <div class="layout">
   <div class="form-column">
     <form method="post">
+      <fieldset>
+        <legend>Malá násobilka</legend>
+        <label>
+          <input type="checkbox" name="small_multiplication_table" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
+          Generovat malou násobilku (činitelé 1–10) místo běžného zadání
+        </label>
+        <div class="row">
+          <label><input type="checkbox" name="smt_mul" <?= $smtIncludeMul ? 'checked' : '' ?>> Násobení</label>
+          <label><input type="checkbox" name="smt_div" <?= $smtIncludeDiv ? 'checked' : '' ?>> Dělení</label>
+        </div>
+        <p class="hint">Když je zaškrtnuté, přepíše nastavení operací, rozsahu a dalších jevů níž (počet příkladů a zobrazení výsledků platí i tady).</p>
+      </fieldset>
+
       <fieldset>
         <legend>Zadání</legend>
         <label>Počet příkladů
@@ -300,7 +365,9 @@ if ($submitted) {
 
       <?php if ($includeSeedInAssignment): ?>
         <hr class="seed-rule">
-        <p class="seed-info"><?= htmlspecialchars(formatConfigSummary($config, $seed)) ?></p>
+        <p class="seed-info"><?= htmlspecialchars(
+            $smallMultiplicationTable ? formatSmtSummary($smtOperators, $seed) : formatConfigSummary($config, $seed)
+        ) ?></p>
       <?php endif; ?>
     <?php elseif ($errorMessage !== null): ?>
       <!-- chyba už je zobrazená výše, tady nic dalšího netřeba -->

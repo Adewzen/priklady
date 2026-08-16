@@ -254,3 +254,24 @@ Ověřeno testem se dvěma extrémy:
 - **Rozvoj do neasociativních větví** (`-`, `÷`): zatím se rozvíjí levá i pravá větev
   rovnocenně; pokud by to v praxi dělalo problémy, dá se omezit.
 - Zlomky, tisk a vizuální design — záměrně mimo scope teď.
+
+## Malá násobilka
+
+Samostatný generátor (`SmallMultiplicationTableGenerator`), ne speciální případ
+`ExampleGenerator`. Důvod: hlavní algoritmus používá JEDEN rozsah `[min,max]` jak pro
+cílový výsledek, tak pro operandy (viz tabulka rozsahu platnosti pravidel výše) — malá
+násobilka ale potřebuje činitele 1–10, zatímco výsledek smí být až 100 (10×10). Zavést
+druhý nezávislý rozsah do rekurzivního algoritmu kvůli jedné ploché, jednoduché funkci
+by nebylo úměrné — proto samostatná třída, znovupoužívající stejné `Node`/`Operator`/
+`Rng`/`Serializer`.
+
+Když je v `index.php` zaškrtnuté "Malá násobilka", přepíše to generování (`Small
+MultiplicationTableGenerator` místo `ExampleGenerator`) i `GeneratorConfig` použitou
+pro `Serializer` (aby se čísla tiskla jako celá, bez závorek) — všechna ostatní pole
+formuláře (operace, rozsah, další jevy, pokročilé) se v tomhle režimu ignorují; platí
+jen počet příkladů, seed a zobrazení výsledků, které jsou orthogonální k oběma režimům.
+
+Dělení generuje přesně inverzní fakt k násobení (`a×b=dělenec`, `b`=dělitel, výsledek
+`a`) — nejde o obecné dělení s hledáním libovolného dělitele, takže tu neplatí pravidla
+"žádná 1" ani limit na `-1` (malá násobilka nemá záporná čísla vůbec, a `×1`/`÷1` jsou
+legitimní, byť triviální, násobilkové fakty, které se v tradiční výuce neskrývají).
