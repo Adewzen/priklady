@@ -91,39 +91,48 @@ final class ExampleGenerator
             return new Literal($target);
         }
 
-        for ($attempt = 0; $attempt < self::MAX_NODE_RETRIES; $attempt++) {
-            $operator = $this->pickWeightedOperator();
-            $remaining = $opsBudget - 1;
-            $leftBudget = $this->rng->int(0, $remaining);
-            $rightBudget = $remaining - $leftBudget;
-
-            try {
-                [$a, $b] = $this->pickOperands($operator, $target, $leftBudget === 0, $rightBudget === 0);
-
-                // Počítadlo se musí zvýšit HNED (ne až po úspěšném sestavení potomků),
-                // jinak by uzel postavený "uvnitř" levé/pravé větve nevěděl, že tenhle
-                // uzel už -1 použil, a mohl by ho použít znovu — přesně věc, které se
-                // tu snažíme zabránit. Při selhání potomků se to musí vrátit zpět.
-                // Pozor: u násobení mohou být OBA operandy -1 naráz (např. cíl 1 → (-1)×(-1)),
-                // proto se počítá, ne jen "ano/ne".
-                $negOneCount = $this->countNegativeOneFactors($operator, $a, $b);
-                if ($negOneCount > 0) {
-                    $this->negativeOneFactorsUsed += $negOneCount;
-                }
+        // Operátory se zkouší v jednou vylosovaném váženém pořadí (bez opakování),
+        // KAŽDÝ dostane plnou sadu MAX_NODE_RETRIES pokusů (různé rozdělení rozpočtu),
+        // než se přejde na dalšího v pořadí. Nejde losovat operátor znovu nezávisle
+        // při každém pokusu (jak to dělal starší kód) — pokud je pro daný cíl jeden
+        // operátor strukturálně neřešitelný (např. dělení bez záporných čísel u cíle
+        // většího než polovina maxima), takové opakované losování by mu dávalo šanci
+        // "vyhrát" znovu a znovu, zatímco by fakticky ubíral šance ostatním — a
+        // realizovaný poměr operátorů by se pak neshodoval s nastavenými vahami.
+        foreach ($this->weightedOperatorOrder() as $operator) {
+            for ($attempt = 0; $attempt < self::MAX_NODE_RETRIES; $attempt++) {
+                $remaining = $opsBudget - 1;
+                $leftBudget = $this->rng->int(0, $remaining);
+                $rightBudget = $remaining - $leftBudget;
 
                 try {
-                    $left = $this->build($a, $leftBudget);
-                    $right = $this->build($b, $rightBudget);
-                } catch (RetryExhaustedException $e) {
-                    if ($negOneCount > 0) {
-                        $this->negativeOneFactorsUsed -= $negOneCount;
-                    }
-                    throw $e;
-                }
+                    [$a, $b] = $this->pickOperands($operator, $target, $leftBudget === 0, $rightBudget === 0);
 
-                return new BinaryOp($operator, $left, $right, $this->scale);
-            } catch (RetryExhaustedException) {
-                continue;
+                    // Počítadlo se musí zvýšit HNED (ne až po úspěšném sestavení potomků),
+                    // jinak by uzel postavený "uvnitř" levé/pravé větve nevěděl, že tenhle
+                    // uzel už -1 použil, a mohl by ho použít znovu — přesně věc, které se
+                    // tu snažíme zabránit. Při selhání potomků se to musí vrátit zpět.
+                    // Pozor: u násobení mohou být OBA operandy -1 naráz (např. cíl 1 → (-1)×(-1)),
+                    // proto se počítá, ne jen "ano/ne".
+                    $negOneCount = $this->countNegativeOneFactors($operator, $a, $b);
+                    if ($negOneCount > 0) {
+                        $this->negativeOneFactorsUsed += $negOneCount;
+                    }
+
+                    try {
+                        $left = $this->build($a, $leftBudget);
+                        $right = $this->build($b, $rightBudget);
+                    } catch (RetryExhaustedException $e) {
+                        if ($negOneCount > 0) {
+                            $this->negativeOneFactorsUsed -= $negOneCount;
+                        }
+                        throw $e;
+                    }
+
+                    return new BinaryOp($operator, $left, $right, $this->scale);
+                } catch (RetryExhaustedException) {
+                    continue;
+                }
             }
         }
 
@@ -131,30 +140,47 @@ final class ExampleGenerator
     }
 
     /**
-     * Vážený výběr operátoru podle GeneratorConfig::operatorWeights (ruletové kolo).
-     * Když vyjde součet vah 0 (např. uživatel dá všem povoleným operátorům váhu 0),
-     * spadne se zpět na rovnoměrný výběr, ať generování nezůstane bez operátoru.
+     * Všechny povolené operátory ve váženě náhodném pořadí BEZ opakování (postupné
+     * ruletové losování ze zmenšujícího se zbytku) — vyšší váha = větší šance být dřív.
+     * Použití v build(): každý operátor dostane plnou sadu pokusů dřív, než přijde na
+     * řadu další — viz komentář tam, proč to nejde losovat nezávisle při každém pokusu.
+     *
+     * Operátor s váhou 0 se do pořadí vůbec nezařadí (normalizovaná pravděpodobnost
+     * 0 % = nikdy) — POKUD existuje aspoň jeden povolený operátor s kladnou váhou.
+     * Když mají váhu 0 úplně všechny povolené operátory, spadne se na čistě náhodné
+     * pořadí mezi nimi, ať generování nezůstane bez jakéhokoliv operátoru ke zkoušení.
+     *
+     * @return Operator[]
      */
-    private function pickWeightedOperator(): Operator
+    private function weightedOperatorOrder(): array
     {
         $operators = $this->config->operators;
         $weights = array_map(fn(Operator $op) => $this->config->operatorWeight($op), $operators);
-        $total = array_sum($weights);
 
-        if ($total <= 0) {
-            return $operators[$this->rng->int(0, count($operators) - 1)];
+        if (array_sum($weights) <= 0) {
+            return $this->rng->shuffled($operators);
         }
 
-        $roll = $this->rng->int(1, $total);
-        $cumulative = 0;
-        foreach ($operators as $i => $op) {
-            $cumulative += $weights[$i];
-            if ($roll <= $cumulative) {
-                return $op;
+        $remaining = array_values(array_filter($operators, fn(Operator $op) => $this->config->operatorWeight($op) > 0));
+        $order = [];
+
+        while ($remaining !== []) {
+            $currentWeights = array_map(fn(Operator $op) => $this->config->operatorWeight($op), $remaining);
+            $total = array_sum($currentWeights);
+
+            $roll = $this->rng->int(1, $total);
+            $cumulative = 0;
+            foreach ($remaining as $i => $op) {
+                $cumulative += $currentWeights[$i];
+                if ($roll <= $cumulative) {
+                    $order[] = $op;
+                    array_splice($remaining, $i, 1);
+                    continue 2;
+                }
             }
         }
 
-        return $operators[count($operators) - 1];
+        return $order;
     }
 
     /** Náhodné číslo z rozsahu — s bias na počet cifer, nebo čistě uniformní, podle configu. */

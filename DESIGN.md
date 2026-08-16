@@ -211,15 +211,40 @@ pickRangedInt()` pak přepíná mezi `Rng::intBiasedByDigits()` a obyčejným `R
 
 `GeneratorConfig::operatorWeights` (pole `Operator::value => 0-100`, ve formuláři čtyři
 pole v sekci "Pokročilé", výchozí 50 pro každý) řídí pravděpodobnost výběru operátoru
-v `ExampleGenerator::pickWeightedOperator()` — ruletové kolo přes váhy POVOLENÝCH
-operátorů (váha operátoru, který není v `operators`, se nikdy nepoužije). Nejde o
-tvrdý poměr v hotových příkladech (počet operátorů je diskrétní na uzel, ne spojitá
-veličina), ale o pravděpodobnost při KAŽDÉM výběru operátoru — ověřeno testem (váhy
-90/10/0/0 pro +/−/×/÷ daly na 300 příkladech skutečný poměr 90,3 % / 9,7 %).
+v rámci POVOLENÝCH operátorů (váha operátoru, který není v `operators`, se nikdy
+nepoužije).
 
-Okrajový případ: pokud součet vah všech POVOLENÝCH operátorů vyjde 0 (uživatel dá
-všem povoleným operátorům váhu 0), spadne se zpět na rovnoměrný výběr mezi nimi —
-jinak by generování nemělo operátor k výběru. Ověřeno testem.
+**Bug nalezený po nasazení (hlášeno jako "násobení reaguje na ovládání od dělení"):**
+první verze (`pickWeightedOperator()`) losovala operátor NEZÁVISLE znovu z celého
+váženého rozdělení při KAŽDÉM pokusu v `build()`. Když zvolený operátor pro daný cíl
+selhal, další pokus si znovu mohl vylosovat TÉŽ jeho — a pro operátory, které jsou pro
+některé cíle strukturálně neřešitelné (typicky `÷` bez záporných čísel u cíle většího
+než polovina maxima — jediné funkční `b` by muselo být `1`, a to je zakázané), se tím
+šance nekontrolovaně přesouvaly k operátoru, který se pro daný cíl snáz podaří — bez
+ohledu na nastavené váhy. Izolovaný test samotné `pickWeightedOperator()` (bez vlivu
+retry) dal správný poměr (83,2 % vs. očekávaných 83,3 %) — bug tedy nebyl v matematice
+výběru, ale v tom, že se losovalo ZNOVU při každém neúspěšném pokusu.
+
+**Oprava:** `ExampleGenerator::weightedOperatorOrder()` vylosuje pro daný uzel POŘADÍ
+všech povolených operátorů JEDNOU (ruletové losování bez opakování ze zmenšujícího se
+zbytku), a `build()` pak zkusí KAŽDÝ operátor v tomhle pořadí s plnou sadou
+`MAX_NODE_RETRIES` pokusů (různé rozdělení rozpočtu), než přejde na dalšího v pořadí.
+Operátor s váhou 0 se do pořadí vůbec nezařadí (nikdy se nezkusí) — POKUD existuje
+aspoň jeden povolený operátor s kladnou váhou; když mají váhu 0 úplně všechny, spadne
+se na čistě náhodné pořadí mezi nimi, ať má generování vůbec co zkoušet.
+
+**Zbývající nepřesnost (inherentní, ne bug):** i s touhle opravou platí, že když je
+pro konkrétní cíl operátor s vyšší váhou strukturálně neřešitelný (viz výše — typicky
+`÷`/`×` v úzkém rozsahu bez záporných čísel), pořadí ho sice vyzkouší jako první, ale
+neuspěje, a použije se další v pořadí MÍSTO NĚJ — realizovaný poměr se pak nedokáže
+přesně shodovat s nastavenými vahami. To nejde odstranit beze změny základního
+algoritmu (cíl se volí NEZÁVISLE na operátoru, teprve pak se hledá funkční rozklad) —
+lze to jen zmírnit širším rozsahem a/nebo povolenými zápornými čísly.
+Ověřeno testem se dvěma extrémy:
+- úzký rozsah `[2,200]` bez záporných čísel, váhy ×90 ÷10 (chceme 83/17): vyšlo 62/38 —
+  citelná odchylka.
+- široký rozsah `[-1000,1000]` se zápornými čísly, stejné váhy: vyšlo 87/13 — v mezích
+  běžného statistického šumu pro vzorek 400 příkladů.
 
 ## Známé zjednodušení / TODO na příště
 
