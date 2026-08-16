@@ -361,7 +361,6 @@ if ($submitted) {
     color: var(--paper-ink);
     border-radius: 3px;
     box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
-    transform: rotate(-0.4deg);
     padding: 1.6rem 1.9rem 1.9rem;
   }
   .tape {
