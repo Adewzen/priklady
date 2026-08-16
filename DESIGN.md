@@ -296,21 +296,40 @@ Ověřeno testem se dvěma extrémy:
 
 ## Malá násobilka
 
-Samostatný generátor (`SmallMultiplicationTableGenerator`), ne speciální případ
-`ExampleGenerator`. Důvod: hlavní algoritmus používá JEDEN rozsah `[min,max]` jak pro
-cílový výsledek, tak pro operandy (viz tabulka rozsahu platnosti pravidel výše) — malá
-násobilka ale potřebuje činitele 1–10, zatímco výsledek smí být až 100 (10×10). Zavést
-druhý nezávislý rozsah do rekurzivního algoritmu kvůli jedné ploché, jednoduché funkci
-by nebylo úměrné — proto samostatná třída, znovupoužívající stejné `Node`/`Operator`/
-`Rng`/`Serializer`.
+**Verze 1 (opuštěná):** samostatný generátor (`SmallMultiplicationTableGenerator`),
+který při zaškrtnutí přepsal ÚPLNĚ VŠECHNO ostatní nastavení — vygeneroval jen izolované
+násobilkové fakty (`6 × 7 =`), žádné sčítání/odčítání, žádné víceoperátorové příklady.
+Ukázalo se, že to byl špatný model významu: uživatel chtěl, aby "malá násobilka"
+znamenala "když se v příkladu použije × nebo ÷, ať jsou to jen fakty 1–10" — ne
+"vygeneruj JEN násobilku a nic jiného". Tedy omezení na konkrétní typ uzlu v rámci
+běžného vícoperátorového příkladu, ne náhradu celého generování.
 
-Když je v `index.php` zaškrtnuté "Malá násobilka", přepíše to generování (`Small
-MultiplicationTableGenerator` místo `ExampleGenerator`) i `GeneratorConfig` použitou
-pro `Serializer` (aby se čísla tiskla jako celá, bez závorek) — všechna ostatní pole
-formuláře (operace, rozsah, další jevy, pokročilé) se v tomhle režimu ignorují; platí
-jen počet příkladů, seed a zobrazení výsledků, které jsou orthogonální k oběma režimům.
+**Verze 2 (aktuální):** `GeneratorConfig::smallMultiplicationTable` (bool) — jde o
+omezení kladené na uzly `×` a `÷` uvnitř `ExampleGenerator`, ne samostatný režim.
+`pickMulOperands()`/`pickDivOperands()` na začátku větví na `pickSmallTableMulOperands()`/
+`pickSmallTableDivOperands()`, pokud je flag zapnutý:
 
-Dělení generuje přesně inverzní fakt k násobení (`a×b=dělenec`, `b`=dělitel, výsledek
-`a`) — nejde o obecné dělení s hledáním libovolného dělitele, takže tu neplatí pravidla
-"žádná 1" ani limit na `-1` (malá násobilka nemá záporná čísla vůbec, a `×1`/`÷1` jsou
-legitimní, byť triviální, násobilkové fakty, které se v tradiční výuce neskrývají).
+- `pickSmallTableMulOperands`: enumeruje všechny dvojice `(a,b)` s `a,b ∈ {1,...,10}`
+  (a jejich záporné varianty, pokud jsou povolená záporná čísla), jejichž součin dá
+  `target` — místo obecného hledání dělitelů `target` v celém `[min,max]`.
+- `pickSmallTableDivOperands`: `target` (podíl) musí být `1–10`, dělitel `b` taky
+  `1–10` — dělenec `a = target × b` pak přirozeně vyjde až do `100`, i když `target`
+  a `b` jsou malé (přesně jako `56 ÷ 8 = 7`, kde `56` je "velké" jen jako dělenec).
+
+Obě varianty pořád respektují existující pravidla "žádná 1 jako činitel" a limit na
+`-1` (`negativeOneFactorsUsed`/`maxNegativeOneFactors`) — teď už to totiž NENÍ izolovaný
+fakt, kde je `×1`/`÷1` neškodné, ale součást většího příkladu, kde by hidden `×1`
+plýtvalo operací stejně jako kdekoliv jinde.
+
+Zbytek příkladu (`+`, `-`, rozsah, počet operací, závorky, priorita, ...) se generuje
+úplně normálně přes zbytek `ExampleGenerator` beze změny — `×`/`÷` uzly jsou jen o
+trochu omezenější v tom, jaké hodnoty smí nabývat. `index.php` už nemá žádné
+speciální větvení generátoru ani `GeneratorConfig` pro serializaci — jeden config,
+jeden `ExampleGenerator`, přesně jako pro všechno ostatní.
+
+Vedlejší efekt: cíl uzlu `×`/`÷` teď MUSÍ padnout do dosažitelné množiny (součin/podíl
+dvou čísel 1–10) — pro cíle mimo tuhle množinu `pickSmallTableMulOperands`/`DivOperands`
+zamítnou (`RetryExhaustedException`) a `build()` zkusí jiný operátor. U velmi úzkých
+kombinací (např. `operationsCount` vysoký + jen `×`/`÷` povolené + malá násobilka
+omezení) to může zvýšit počet pokusů/pravděpodobnost timeoutu — zatím se to v praxi
+neprojevilo jako problém, ale stojí za to hlídat.

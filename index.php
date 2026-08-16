@@ -8,7 +8,6 @@ use Priklady\Operator;
 use Priklady\GeneratorConfig;
 use Priklady\Rng;
 use Priklady\ExampleGenerator;
-use Priklady\SmallMultiplicationTableGenerator;
 use Priklady\Serializer;
 use Priklady\GenerationFailedException;
 
@@ -79,7 +78,6 @@ foreach ($operatorWeightKeys as $opValue => $fieldName) {
 }
 
 $smallMultiplicationTable = readBool($input, 'small_multiplication_table');
-$smtOperators = [Operator::Mul, Operator::Div];
 
 $config = new GeneratorConfig(
     count: $count,
@@ -98,35 +96,15 @@ $config = new GeneratorConfig(
     maxNegativeOneFactors: $maxNegativeOneFactors,
     digitCountBiasEnabled: $digitCountBiasEnabled,
     operatorWeights: $operatorWeights,
+    smallMultiplicationTable: $smallMultiplicationTable,
 );
 
 $priorityParensWarning = $submitted
-    && !$smallMultiplicationTable
     && !$allowOperatorPriority
     && !$allowParentheses
     && $config->usesMultiplePrecedenceClasses();
 
-// Malá násobilka má vlastní jednoduchý generátor (jiný rozsah pro činitele než pro
-// výsledek, viz SmallMultiplicationTableGenerator) — Serializer ale pořád potřebuje
-// nějaký GeneratorConfig, tak mu dáme "neutrální" verzi (celá čísla, žádné závorky).
-$serializerConfig = $smallMultiplicationTable
-    ? new GeneratorConfig(
-        count: $count,
-        operationsCount: 1,
-        min: 1,
-        max: 100,
-        operators: $smtOperators,
-        allowDecimals: false,
-        decimalPlaces: 0,
-        allowNegative: false,
-        allowParentheses: false,
-        allowOperatorPriority: false,
-        showResults: $showResults,
-        seed: $seed,
-    )
-    : $config;
-
-$serializer = new Serializer($serializerConfig);
+$serializer = new Serializer($config);
 $examples = [];
 $errorMessage = null;
 
@@ -155,28 +133,16 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
         }
         $parts[] = 'Váhy operátorů: ' . implode(', ', $weights);
     }
-    return implode(' · ', $parts);
-}
-
-function formatSmtSummary(array $operators, int $seed): string
-{
-    $parts = [
-        'Seed: ' . $seed,
-        'Malá násobilka (činitelé 1–10)',
-        'Operace: ' . implode(', ', array_map(fn($op) => $op->symbol(), $operators)),
-    ];
+    if ($config->smallMultiplicationTable) {
+        $parts[] = 'Malá násobilka (× a ÷ jen 1–10): ano';
+    }
     return implode(' · ', $parts);
 }
 
 if ($submitted) {
     try {
-        if ($smallMultiplicationTable) {
-            $generator = new SmallMultiplicationTableGenerator($count, $smtOperators, new Rng($seed));
-            $examples = $generator->generateBatch();
-        } else {
-            $generator = new ExampleGenerator($config, new Rng($seed));
-            $examples = $generator->generateBatch();
-        }
+        $generator = new ExampleGenerator($config, new Rng($seed));
+        $examples = $generator->generateBatch();
     } catch (GenerationFailedException $e) {
         $errorMessage = $e->getMessage();
     }
@@ -530,9 +496,9 @@ if ($submitted) {
           <div class="field-group">
             <label class="toggle-row">
               <input type="checkbox" name="small_multiplication_table" id="f-smt" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
-              Malá násobilka (činitelé 1–10, násobení i dělení)
+              Malá násobilka (× a ÷ jen s čísly 1–10)
             </label>
-            <p class="hint">Když je zaškrtnuté, přepíše rozsah a operace výš.</p>
+            <p class="hint">Omezí jen násobení a dělení — zbytek příkladu (+, −, rozsah, počet operací, závorky) se generuje podle nastavení výš beze změny.</p>
           </div>
 
           <h4>Zadání</h4>
@@ -668,9 +634,7 @@ if ($submitted) {
           <?php endif; ?>
 
           <?php if ($includeSeedInAssignment): ?>
-            <p class="seed-info"><?= htmlspecialchars(
-                $smallMultiplicationTable ? formatSmtSummary($smtOperators, $seed) : formatConfigSummary($config, $seed)
-            ) ?></p>
+            <p class="seed-info"><?= htmlspecialchars(formatConfigSummary($config, $seed)) ?></p>
           <?php endif; ?>
         <?php elseif ($errorMessage === null): ?>
           <p class="placeholder-text">

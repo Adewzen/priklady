@@ -280,6 +280,10 @@ final class ExampleGenerator
     /** a * b = target (ve škálovaných jednotkách: a*b = target*scale) */
     private function pickMulOperands(int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
     {
+        if ($this->config->smallMultiplicationTable) {
+            return $this->pickSmallTableMulOperands($target, $leftIsLeaf, $rightIsLeaf);
+        }
+
         $scale = $this->scale;
         $product = $target * $scale;
         if ($product === 0) {
@@ -336,6 +340,67 @@ final class ExampleGenerator
         throw new RetryExhaustedException("Součin {$target} nelze v daném rozsahu rozložit na dva činitele.");
     }
 
+    /**
+     * Varianta pickMulOperands pro omezení "malá násobilka": oba činitele smí být jen
+     * 1–10 (případně -10..-1, pokud jsou povolená záporná čísla) — bez ohledu na to,
+     * jak velký je $target. Necílí přímo na dělitele $target jako obecné násobení,
+     * ale enumeruje všechny dvojice 1–10, jejichž součin dá $target.
+     */
+    private function pickSmallTableMulOperands(int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
+    {
+        if ($this->scale !== 1) {
+            throw new RetryExhaustedException('Malá násobilka nepodporuje desetinná čísla.');
+        }
+
+        $absTarget = abs($target);
+        $candidates = [];
+        for ($a = 1; $a <= 10; $a++) {
+            if ($absTarget % $a !== 0) {
+                continue;
+            }
+            $b = intdiv($absTarget, $a);
+            if ($b < 1 || $b > 10) {
+                continue;
+            }
+            if ($target >= 0) {
+                $candidates[] = [$a, $b];
+                if ($this->config->allowNegative) {
+                    $candidates[] = [-$a, -$b];
+                }
+            } elseif ($this->config->allowNegative) {
+                $candidates[] = [-$a, $b];
+                $candidates[] = [$a, -$b];
+            }
+        }
+        $candidates = $this->rng->shuffled($candidates);
+
+        foreach ($candidates as [$a, $b]) {
+            if ($a < $this->scaledMin || $a > $this->scaledMax) {
+                continue;
+            }
+            if ($b < $this->scaledMin || $b > $this->scaledMax) {
+                continue;
+            }
+            if ($a === 1 || $b === 1) {
+                continue;
+            }
+            $negOneCount = ($a === -1 ? 1 : 0) + ($b === -1 ? 1 : 0);
+            if ($negOneCount > 0 && $this->negativeOneFactorsUsed + $negOneCount > $this->config->maxNegativeOneFactors) {
+                continue;
+            }
+            if ($leftIsLeaf && $a === 0) {
+                continue;
+            }
+            if ($rightIsLeaf && $b === 0) {
+                continue;
+            }
+
+            return [$a, $b];
+        }
+
+        throw new RetryExhaustedException("Součin {$target} není dosažitelný jako součin dvou čísel malé násobilky (1-10).");
+    }
+
     /** a / b = target (ve škálovaných jednotkách: a = target*b/scale) */
     private function pickDivOperands(int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
     {
@@ -346,6 +411,9 @@ final class ExampleGenerator
         // Stejný důvod jako u odčítání s cílem 0, viz pickSubOperands.
         if ($target === $this->scale) {
             throw new RetryExhaustedException('Dělení s cílovým výsledkem 1 by bylo vždy triviální (a ÷ a).');
+        }
+        if ($this->config->smallMultiplicationTable) {
+            return $this->pickSmallTableDivOperands($target, $leftIsLeaf, $rightIsLeaf);
         }
 
         $scale = $this->scale;
@@ -379,6 +447,54 @@ final class ExampleGenerator
         }
 
         throw new RetryExhaustedException("Podíl {$target} nelze v daném rozsahu rozložit.");
+    }
+
+    /**
+     * Varianta pickDivOperands pro omezení "malá násobilka": dělitel i výsledek (podíl)
+     * musí být 1–10 (případně -10..-1), dělenec pak vyjde přirozeně až do 100.
+     * $target === 0 a $target === $scale (tj. přesně 1) jsou zamítnuté už výš v
+     * pickDivOperands, takže se sem nikdy nedostanou.
+     */
+    private function pickSmallTableDivOperands(int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
+    {
+        if ($this->scale !== 1) {
+            throw new RetryExhaustedException('Malá násobilka nepodporuje desetinná čísla.');
+        }
+        if (abs($target) > 10) {
+            throw new RetryExhaustedException("Podíl s výsledkem {$target} přesahuje malou násobilku (1-10).");
+        }
+
+        $candidates = [];
+        for ($b = 1; $b <= 10; $b++) {
+            $a = $target * $b;
+            $candidates[] = [$a, $b];
+            if ($this->config->allowNegative) {
+                $candidates[] = [-$a, -$b];
+            }
+        }
+        $candidates = $this->rng->shuffled($candidates);
+
+        foreach ($candidates as [$a, $b]) {
+            if ($a < $this->scaledMin || $a > $this->scaledMax) {
+                continue;
+            }
+            if ($b < $this->scaledMin || $b > $this->scaledMax) {
+                continue;
+            }
+            if ($b === 1) {
+                continue;
+            }
+            if ($b === -1 && $this->negativeOneFactorsUsed + 1 > $this->config->maxNegativeOneFactors) {
+                continue;
+            }
+            if ($leftIsLeaf && $a === 0) {
+                continue;
+            }
+
+            return [$a, $b];
+        }
+
+        throw new RetryExhaustedException("Podíl {$target} nelze v malé násobilce rozložit.");
     }
 
     /**

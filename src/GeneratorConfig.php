@@ -33,6 +33,13 @@ final class GeneratorConfig
          * @var array<string,int>
          */
         public readonly array $operatorWeights = [],
+        /**
+         * Omezí × a ÷ na "malou násobilku" (oba činitele/dělitel a výsledek 1–10) —
+         * NENÍ to samostatný režim, jen omezení kladené na uzly × a ÷ v rámci běžného
+         * algoritmu. Zbytek příkladu (+, −, rozsah, počet operací, závorky, ...) se
+         * generuje normálně podle ostatních nastavení.
+         */
+        public readonly bool $smallMultiplicationTable = false,
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
