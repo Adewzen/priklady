@@ -20,7 +20,8 @@ final class GeneratorConfig
         public readonly bool $allowOperatorPriority,
         public readonly bool $showResults,
         public readonly int $seed,
-        public readonly bool $avoidDoubleNegative = true,
+        /** 0 = žádný bias (čistě náhodné), 100 = maximální snaha vyhnout se "a + (-b)" / "a - (-b)". */
+        public readonly int $doubleNegativeBiasPercent = 70,
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
@@ -36,6 +37,9 @@ final class GeneratorConfig
         }
         if ($decimalPlaces < 0 || $decimalPlaces > 2) {
             throw new \InvalidArgumentException('Počet desetinných míst musí být 0 až 2.');
+        }
+        if ($doubleNegativeBiasPercent < 0 || $doubleNegativeBiasPercent > 100) {
+            throw new \InvalidArgumentException('Míra biasu proti dvojitým znaménkům musí být 0 až 100.');
         }
     }
 

@@ -125,8 +125,8 @@ final class ExampleGenerator
         // se to nezacyklí, když je nezáporné b v daném rozsahu nedosažitelné.
         $preferredHighA = min($highA, $target);
         $preferNonNegativeB = $this->config->allowNegative
-            && $this->config->avoidDoubleNegative
-            && $preferredHighA >= $lowA;
+            && $preferredHighA >= $lowA
+            && $this->shouldPreferNonNegative();
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
@@ -158,8 +158,8 @@ final class ExampleGenerator
         // Preferuj b >= 0, ať se omezí ošklivé zápisy typu "40 - (-19)".
         $preferredLowB = max($lowB, 0);
         $preferNonNegativeB = $this->config->allowNegative
-            && $this->config->avoidDoubleNegative
-            && $preferredLowB <= $highB;
+            && $preferredLowB <= $highB
+            && $this->shouldPreferNonNegative();
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
@@ -266,6 +266,22 @@ final class ExampleGenerator
         }
 
         throw new RetryExhaustedException("Podíl {$target} nelze v daném rozsahu rozložit.");
+    }
+
+    /**
+     * Losuje, jestli se pro aktuální uzel + / - má zkusit preferovat nezáporné b
+     * (viz pickAddOperands/pickSubOperands). Řízeno GeneratorConfig::doubleNegativeBiasPercent.
+     */
+    private function shouldPreferNonNegative(): bool
+    {
+        $percent = $this->config->doubleNegativeBiasPercent;
+        if ($percent <= 0) {
+            return false;
+        }
+        if ($percent >= 100) {
+            return true;
+        }
+        return $this->rng->int(1, 100) <= $percent;
     }
 
     private function randomValue(int $min, int $max, bool $allowZero): int

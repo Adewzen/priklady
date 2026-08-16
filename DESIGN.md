@@ -129,8 +129,25 @@ konstrukcí za sebou). Teď se u obou preferuje `b >= 0` (tj. výsledek za `+`/`
 list) — posledních několik pokusů z `MAX_NODE_RETRIES` rozsah uvolní na celý povolený
 interval, ať se generování nezacyklí, když nezáporné `b` v daném rozsahu není dosažitelné.
 Je to jen bias, ne tvrdý zákaz — se zapnutými zápornými čísly se pořád objeví, jen řidčeji.
-Změřeno na dávce 200 příkladů (rozsah -1000..1000, `+`/`-`/`×`, 3 operace): pokles ze
-68 % na 30 % příkladů obsahujících tenhle vzor.
+
+Síla biasu je nastavitelná ve formuláři (sekce "Pokročilé") jako `GeneratorConfig::
+doubleNegativeBiasPercent` (0–100, výchozí 70). `ExampleGenerator::shouldPreferNonNegative()`
+si pro každý `+`/`-` uzel s touto pravděpodobností "hodí mincí", jestli se pro něj bias
+vůbec zkusí uplatnit — takže % přímo odpovídá zhruba tomu, u jak velkého podílu uzlů
+se preference projeví (ne přesně výsledné frekvenci vzoru ve vygenerovaných příkladech,
+protože jeden příklad má víc uzlů a stačí, aby vzor vznikl na jediném z nich).
+Změřeno na dávce 300 příkladů (rozsah -1000..1000, jen `+`/`-`, 3 operace):
+
+| bias | výskyt vzoru v příkladu |
+|---|---|
+| 0 %   | 88 % |
+| 30 %  | 75 % |
+| 70 %  | 55 % |
+| 100 % | 29 % |
+
+Ani 100 % bias vzor úplně nevymýtí — pár posledních retry pokusů se vždy rozsah uvolní
+na celý povolený interval, ať se generování nezacyklí, když nezáporné `b` v daném rozsahu
+není vůbec dosažitelné.
 
 Vedle toho byl opravený bug v `Serializer::printChild()` — otevření nové závorky
 zakládá "nový začátek výrazu", takže se vnitřek už neobalí zbytečně druhou vnitřní

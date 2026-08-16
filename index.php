@@ -61,7 +61,7 @@ $seed = $useSeed
     ? readInt($input, 'seed', random_int(1, 1_000_000))
     : random_int(1, 1_000_000);
 $includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : true;
-$avoidDoubleNegative = $submitted ? readBool($input, 'avoid_double_negative') : true;
+$doubleNegativeBiasPercent = max(0, min(100, readInt($input, 'double_negative_bias', 70)));
 
 $config = new GeneratorConfig(
     count: $count,
@@ -76,7 +76,7 @@ $config = new GeneratorConfig(
     allowOperatorPriority: $allowOperatorPriority,
     showResults: $showResults,
     seed: $seed,
-    avoidDoubleNegative: $avoidDoubleNegative,
+    doubleNegativeBiasPercent: $doubleNegativeBiasPercent,
 );
 
 $priorityParensWarning = $submitted
@@ -102,7 +102,7 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
         'Priorita operátorů: ' . ($config->allowOperatorPriority ? 'ano' : 'ne'),
     ];
     if ($config->allowNegative) {
-        $parts[] = 'Omezit dvojitá znaménka: ' . ($config->avoidDoubleNegative ? 'ano' : 'ne');
+        $parts[] = 'Bias proti dvojitým znaménkům: ' . $config->doubleNegativeBiasPercent . ' %';
     }
     return implode(' · ', $parts);
 }
@@ -200,9 +200,8 @@ if ($submitted) {
 
       <fieldset>
         <legend>Pokročilé</legend>
-        <label>
-          <input type="checkbox" name="avoid_double_negative" <?= $avoidDoubleNegative ? 'checked' : '' ?>>
-          Omezit zápisy typu "a + (-b)" / "a - (-b)"
+        <label>Omezit zápisy typu "a + (-b)" / "a - (-b)" (0 % = vypnuto, 100 % = maximálně)
+          <input type="number" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10"> %
         </label>
       </fieldset>
 
