@@ -120,8 +120,17 @@ final class ExampleGenerator
             throw new RetryExhaustedException("Součet {$target} nelze rozložit v daném rozsahu.");
         }
 
+        // Preferuj a <= target (tedy b = target - a >= 0), ať se omezí ošklivé
+        // zápisy typu "40 + (-19)". Pár posledních pokusů rozsah uvolní, ať
+        // se to nezacyklí, když je nezáporné b v daném rozsahu nedosažitelné.
+        $preferredHighA = min($highA, $target);
+        $preferNonNegativeB = $this->config->allowNegative && $preferredHighA >= $lowA;
+
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $a = $this->rng->int($lowA, $highA);
+            $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
+            $a = $useFullRange
+                ? $this->rng->int($lowA, $highA)
+                : $this->rng->int($lowA, $preferredHighA);
             $b = $target - $a;
             if ($leftIsLeaf && $a === 0) {
                 continue;
@@ -144,8 +153,15 @@ final class ExampleGenerator
             throw new RetryExhaustedException("Rozdíl {$target} nelze rozložit v daném rozsahu.");
         }
 
+        // Preferuj b >= 0, ať se omezí ošklivé zápisy typu "40 - (-19)".
+        $preferredLowB = max($lowB, 0);
+        $preferNonNegativeB = $this->config->allowNegative && $preferredLowB <= $highB;
+
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $b = $this->rng->int($lowB, $highB);
+            $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
+            $b = $useFullRange
+                ? $this->rng->int($lowB, $highB)
+                : $this->rng->int($preferredLowB, $highB);
             $a = $target + $b;
             if ($leftIsLeaf && $a === 0) {
                 continue;

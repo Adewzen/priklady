@@ -120,6 +120,22 @@ seedem dají bit-přesně stejný výstup). Reprodukovatelnost je garantovaná j
 téhle verze algoritmu — jakákoliv budoucí změna pořadí volání `rng->int()` naruší staré
 seedy (dá to jiný, ale pořád platný výsledek, ne chybu).
 
+## Heuristika: omezení `a + (-b)` / `a - (-b)`
+
+Se zapnutými zápornými čísly `pickAddOperands`/`pickSubOperands` (v `ExampleGenerator`)
+původně vybíraly operandy čistě náhodně, což často vedlo k ošklivým zápisům jako
+`40 + (-19)` nebo `40 - (-19)` (a při vnoření do dalších uzlů i k řetězení víc takových
+konstrukcí za sebou). Teď se u obou preferuje `b >= 0` (tj. výsledek za `+`/`-` je kladný
+list) — posledních několik pokusů z `MAX_NODE_RETRIES` rozsah uvolní na celý povolený
+interval, ať se generování nezacyklí, když nezáporné `b` v daném rozsahu není dosažitelné.
+Je to jen bias, ne tvrdý zákaz — se zapnutými zápornými čísly se pořád objeví, jen řidčeji.
+Změřeno na dávce 200 příkladů (rozsah -1000..1000, `+`/`-`/`×`, 3 operace): pokles ze
+68 % na 30 % příkladů obsahujících tenhle vzor.
+
+Vedle toho byl opravený bug v `Serializer::printChild()` — otevření nové závorky
+zakládá "nový začátek výrazu", takže se vnitřek už neobalí zbytečně druhou vnitřní
+závorkou kolem úvodního záporného čísla (`((-19) + 38)` → `(-19 + 38)`).
+
 ## Známé zjednodušení / TODO na příště
 
 - **Variabilní počet operací**: teď je pevný podle zadání, ne rozsah/náhoda.

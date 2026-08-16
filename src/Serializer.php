@@ -66,7 +66,10 @@ final class Serializer
         $needsParens = $this->requiresParens($child, $parent->operator, $isRightChild)
             || ($child instanceof Literal && $child->scaledValue() < 0 && !$isLeading);
 
-        $rendered = $this->printNode($child, $isLeading && !$needsParens);
+        // Otevřená závorka založí nový "začátek výrazu" — obsah uvnitř se tedy tiskne
+        // jako by byl znovu na začátku (jinak by např. "(-19 + 38)" zbytečně dostalo
+        // ještě jednu vnitřní závorku kolem "-19": "((-19) + 38)").
+        $rendered = $this->printNode($child, $needsParens || $isLeading);
 
         return $needsParens ? "({$rendered})" : $rendered;
     }
