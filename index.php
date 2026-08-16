@@ -487,6 +487,8 @@ if ($submitted) {
 
   footer.bottom { margin-top: 2.5rem; font-size: 0.78rem; color: var(--chalk-faint); text-align: center; }
   footer.bottom p { margin: 0.25rem 0; }
+  footer.bottom a { color: var(--chalk-dim); text-decoration: underline; }
+  footer.bottom a:hover { color: var(--chalk); }
 
   @media print {
     body::before { display: none; }
@@ -734,7 +736,7 @@ if ($submitted) {
   </div>
 
   <footer class="bottom">
-    <p>Generátor příkladů</p>
+    <p>Generátor příkladů · <a href="https://github.com/Adewzen/priklady">zdrojový kód na GitHubu</a></p>
     <p>© <?= date('Y') ?> Jakub Nezveda · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
   </footer>
 </div>

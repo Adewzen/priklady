@@ -4,6 +4,8 @@ Webová aplikace na generování aritmetických příkladů pro procvičování 
 škole (1.–5. třída). Zadáš obtížnost (nebo si nastavení sestavíš sám), aplikace
 vygeneruje seznam příkladů a volitelně i výsledky — hotové na vytištění.
 
+**Běžící instance:** https://priklady.adewzen.cz
+
 ## Funkce
 
 - Presety podle třídy (1.–5.) + volba "Vše" pro plné, ničím neomezené nastavení
