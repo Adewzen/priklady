@@ -267,6 +267,11 @@ if ($submitted) {
   .row { display: flex; gap: 0.6rem; }
   .row .field-group { flex: 1; margin-bottom: 0; }
 
+  /* 2×2 mřížka místo 4 polí v řadě — ve 4 sloupcích vedle sebe na šířku panelu
+     nebylo dost místa ani na "50 %" (hodnota se ořezávala). */
+  .weight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 0.7rem; margin-top: 0.4rem; }
+  .weight-grid .field-group { margin-bottom: 0; }
+
   /* --- operator chips --- */
   .op-row { display: flex; gap: 0.5rem; }
   .op-chip {
@@ -359,13 +364,13 @@ if ($submitted) {
   .whole-number-bias-group { display: none; }
   form:has(input[name="allow_decimals"]:checked) .whole-number-bias-group { display: block; }
 
-  /* Vstup s jednotkou "%" napravo v poli. */
-  .unit-field { position: relative; }
-  .unit-field input[type="number"] { padding-right: 2.1rem; }
-  .unit-field .unit {
-    position: absolute; right: 0.7rem; top: 50%; transform: translateY(-50%);
-    color: var(--chalk-faint); font-size: 0.85rem; pointer-events: none;
-  }
+  /* Vstup s jednotkou "%" vedle pole — "%" jako vlastní flex položka (ne přes
+     position:absolute s pevně rezervovaným místem), ať v úzkých sloupcích (např.
+     4 vedle sebe u vah operátorů) hodnota vždycky dostane, kolik místa potřebuje,
+     a "%" si vezme jen tolik, kolik zabere samo. */
+  .unit-field { display: flex; align-items: center; gap: 0.35rem; }
+  .unit-field input[type="number"] { flex: 1; min-width: 0; }
+  .unit-field .unit { flex: none; color: var(--chalk-faint); font-size: 0.8rem; white-space: nowrap; }
 
   details.advanced { margin-top: 1.6rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
   details.advanced summary { cursor: pointer; font-size: 0.83rem; color: var(--coral); font-weight: 700; list-style: none; }
@@ -630,7 +635,7 @@ if ($submitted) {
               </div>
               <div class="field-group">
                 <label class="field-label">Pravděpodobnost operátorů (v %, normalizuje se mezi povolenými)</label>
-                <div class="row">
+                <div class="weight-grid">
                   <div class="field-group">
                     <label class="field-label" for="f-weight-add">+</label>
                     <div class="unit-field">
