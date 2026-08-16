@@ -174,6 +174,11 @@ if ($submitted) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Příklady na procvičování</title>
+<meta name="description" content="Generátor aritmetických příkladů pro procvičování na základní škole (1.–5. třída) — sčítání, odčítání, násobení, dělení, s nastavitelnou obtížností a možností tisku.">
+<meta property="og:title" content="Příklady — generátor úloh na procvičování aritmetiky">
+<meta property="og:description" content="Sčítání, odčítání, násobení, dělení pro 1.–5. třídu ZŠ — nastavitelná obtížnost, malá násobilka, tisk.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%96%8D%EF%B8%8F</text></svg>">
 <style>
   :root {
     --board: #1c362e;
