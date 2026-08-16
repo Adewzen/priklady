@@ -24,6 +24,16 @@ final class ExampleGenerator
     private readonly int $scaledMax;
     private readonly Serializer $serializer;
 
+    /**
+     * Kolikrát se v RÁMCI PRÁVĚ STAVĚNÉHO příkladu už použilo "-1" jako činitel/dělitel
+     * (viz pickMulOperands/pickDivOperands). Resetuje se na začátku generateOne(),
+     * zvyšuje/vrací zpět v build() (viz komentář tam — musí se to dít hned po výběru
+     * operandů, ne až po úspěšném sestavení celého podstromu). Pozn.: pokud se celý
+     * tenhle uzel později zahodí kvůli selhání sourozence výš ve stromu, čítač se
+     * nevrací zpět — důsledek je jen o něco konzervativnější chování, nikdy chybný výstup.
+     */
+    private int $negativeOneFactorsUsed = 0;
+
     public function __construct(
         private readonly GeneratorConfig $config,
         private readonly Rng $rng,
@@ -63,6 +73,7 @@ final class ExampleGenerator
 
     private function generateOne(): BinaryOp
     {
+        $this->negativeOneFactorsUsed = 0;
         $target = $this->randomValue($this->scaledMin, $this->scaledMax, allowZero: true);
         $root = $this->build($target, $this->config->operationsCount);
         \assert($root instanceof BinaryOp);
@@ -88,8 +99,25 @@ final class ExampleGenerator
 
             try {
                 [$a, $b] = $this->pickOperands($operator, $target, $leftBudget === 0, $rightBudget === 0);
-                $left = $this->build($a, $leftBudget);
-                $right = $this->build($b, $rightBudget);
+
+                // Počítadlo se musí zvýšit HNED (ne až po úspěšném sestavení potomků),
+                // jinak by uzel postavený "uvnitř" levé/pravé větve nevěděl, že tenhle
+                // uzel už -1 použil, a mohl by ho použít znovu — přesně věc, které se
+                // tu snažíme zabránit. Při selhání potomků se to musí vrátit zpět.
+                $usesNegativeOne = $this->isNegativeOneFactor($operator, $a, $b);
+                if ($usesNegativeOne) {
+                    $this->negativeOneFactorsUsed++;
+                }
+
+                try {
+                    $left = $this->build($a, $leftBudget);
+                    $right = $this->build($b, $rightBudget);
+                } catch (RetryExhaustedException $e) {
+                    if ($usesNegativeOne) {
+                        $this->negativeOneFactorsUsed--;
+                    }
+                    throw $e;
+                }
 
                 return new BinaryOp($operator, $left, $right, $this->scale);
             } catch (RetryExhaustedException) {
@@ -210,8 +238,12 @@ final class ExampleGenerator
             if ($b < $this->scaledMin || $b > $this->scaledMax) {
                 continue;
             }
-            // "1" je jako činitel zakázané (aby úloha nebyla triviální), "-1" povolené.
+            // "1" je jako činitel zakázané (aby úloha nebyla triviální), "-1" povolené,
+            // ale jen omezeně — víc "-1" za sebou se navzájem vyruší a je to triviální znovu.
             if ($a === $scale || $b === $scale) {
+                continue;
+            }
+            if (($a === -$scale || $b === -$scale) && $this->negativeOneFactorsUsed >= $this->config->maxNegativeOneFactors) {
                 continue;
             }
             if ($leftIsLeaf && $a === 0) {
@@ -243,7 +275,10 @@ final class ExampleGenerator
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $b = $this->rng->int($this->scaledMin, $this->scaledMax);
             if ($b === 0 || $b === $scale) {
-                continue; // dělitel nesmí být 0 ani "1" (-1 povoleno)
+                continue; // dělitel nesmí být 0 ani "1" (-1 povoleno, ale omezeně, viz níže)
+            }
+            if ($b === -$scale && $this->negativeOneFactorsUsed >= $this->config->maxNegativeOneFactors) {
+                continue;
             }
 
             $numerator = $target * $b;
@@ -266,6 +301,19 @@ final class ExampleGenerator
         }
 
         throw new RetryExhaustedException("Podíl {$target} nelze v daném rozsahu rozložit.");
+    }
+
+    /**
+     * Je tenhle uzel "násobení/dělení -1"? U dělení se počítá jen dělitel ($b) —
+     * "-1 ÷ 5" není triviální stejným způsobem jako "a × (-1)" nebo "a ÷ (-1)".
+     */
+    private function isNegativeOneFactor(Operator $operator, int $a, int $b): bool
+    {
+        return match ($operator) {
+            Operator::Mul => $a === -$this->scale || $b === -$this->scale,
+            Operator::Div => $b === -$this->scale,
+            default => false,
+        };
     }
 
     /**

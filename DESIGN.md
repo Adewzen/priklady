@@ -153,6 +153,29 @@ Vedle toho byl opravený bug v `Serializer::printChild()` — otevření nové z
 zakládá "nový začátek výrazu", takže se vnitřek už neobalí zbytečně druhou vnitřní
 závorkou kolem úvodního záporného čísla (`((-19) + 38)` → `(-19 + 38)`).
 
+## Heuristika: omezení opakovaného `× (-1)`
+
+Podobný problém jako výše, ale u násobení/dělení: `-1` je jako jediná výjimka povolené
+i přes obecný zákaz "1" jako činitele (viz tabulka rozsahu platnosti pravidel výše) —
+jednotlivé `× (-1)` je smysluplná operace (otočí znaménko), ale **dvě `-1` za sebou se
+navzájem vyruší** a jde zase jen o skrytou triviální operaci (`249 × (-1) × (-1) = 249`),
+přesně to, čemu měl zákaz "1" původně zabránit.
+
+`GeneratorConfig::maxNegativeOneFactors` (výchozí 1, nastavitelné 0–5 ve formuláři v sekci
+"Pokročilé") omezuje, kolikrát smí `-1` vystoupit jako činitel (`×`, obě strany) nebo dělitel
+(`÷`, jen dělitel — `-1 ÷ 5` není stejný druh trivality jako `a ÷ (-1)`) v rámci JEDNOHO
+příkladu. `ExampleGenerator` si drží čítač `$negativeOneFactorsUsed`, resetovaný na začátku
+`generateOne()`.
+
+Důležitý detail v `build()`: čítač se musí zvýšit **hned po výběru operandů**, ne až po
+úspěšném sestavení celého podstromu — jinak by uzel postavený uvnitř levé/pravé větve
+neviděl, že rodičovský uzel `-1` už použil, a mohl by ho použít znovu (přesně tenhle bug
+se objevil při prvním pokusu — čítač se tehdy zvyšoval až po `return new BinaryOp(...)`,
+čili pozdě). Při selhání potomků (retry na této úrovni) se zvýšení vrací zpět. Zůstává
+jedna známá nepřesnost: pokud se celý tenhle uzel později zahodí kvůli selhání sourozence
+o úroveň výš ve stromu, čítač už se nevrací — důsledek je jen mírně konzervativnější
+chování (občas se `-1` nepoužije, i když by ještě "mohlo"), nikdy chybný výstup.
+
 ## Známé zjednodušení / TODO na příště
 
 - **Variabilní počet operací**: teď je pevný podle zadání, ne rozsah/náhoda.

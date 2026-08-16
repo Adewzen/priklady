@@ -62,6 +62,7 @@ $seed = $useSeed
     : random_int(1, 1_000_000);
 $includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : true;
 $doubleNegativeBiasPercent = max(0, min(100, readInt($input, 'double_negative_bias', 70)));
+$maxNegativeOneFactors = max(0, min(5, readInt($input, 'max_negative_one_factors', 1)));
 
 $config = new GeneratorConfig(
     count: $count,
@@ -77,6 +78,7 @@ $config = new GeneratorConfig(
     showResults: $showResults,
     seed: $seed,
     doubleNegativeBiasPercent: $doubleNegativeBiasPercent,
+    maxNegativeOneFactors: $maxNegativeOneFactors,
 );
 
 $priorityParensWarning = $submitted
@@ -103,6 +105,7 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
     ];
     if ($config->allowNegative) {
         $parts[] = 'Bias proti dvojitým znaménkům: ' . $config->doubleNegativeBiasPercent . ' %';
+        $parts[] = 'Max. počet "-1" jako činitele: ' . $config->maxNegativeOneFactors;
     }
     return implode(' · ', $parts);
 }
@@ -202,6 +205,9 @@ if ($submitted) {
         <legend>Pokročilé</legend>
         <label>Omezit zápisy typu "a + (-b)" / "a - (-b)" (0 % = vypnuto, 100 % = maximálně)
           <input type="number" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10"> %
+        </label>
+        <label>Max. počet "-1" jako činitele/dělitele v jednom příkladu (víc za sebou se ruší)
+          <input type="number" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
         </label>
       </fieldset>
 

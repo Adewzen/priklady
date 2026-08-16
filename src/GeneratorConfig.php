@@ -22,6 +22,8 @@ final class GeneratorConfig
         public readonly int $seed,
         /** 0 = žádný bias (čistě náhodné), 100 = maximální snaha vyhnout se "a + (-b)" / "a - (-b)". */
         public readonly int $doubleNegativeBiasPercent = 70,
+        /** Kolikrát smí "-1" vystupovat jako činitel/dělitel v jednom příkladu (víc -1 za sebou se navzájem ruší — triviální). */
+        public readonly int $maxNegativeOneFactors = 1,
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
@@ -40,6 +42,9 @@ final class GeneratorConfig
         }
         if ($doubleNegativeBiasPercent < 0 || $doubleNegativeBiasPercent > 100) {
             throw new \InvalidArgumentException('Míra biasu proti dvojitým znaménkům musí být 0 až 100.');
+        }
+        if ($maxNegativeOneFactors < 0) {
+            throw new \InvalidArgumentException('Maximální počet -1 jako činitele nesmí být záporný.');
         }
     }
 
