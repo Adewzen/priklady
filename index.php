@@ -119,6 +119,14 @@ if ($submitted) {
   .warning { background: #ffe9b3; border: 1px solid #cc8800; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
   .seed-info { color: #777; font-size: 0.85rem; margin: 0 0 0.5rem; }
   .results-block { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #ccc; color: #555; }
+  .print-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
+  .print-actions button { padding: 0.4rem 0.9rem; }
+
+  @media print {
+    header, footer, .form-column, .print-actions, .warning { display: none !important; }
+    .layout { display: block; padding: 0; }
+    .results-column { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -193,6 +201,10 @@ if ($submitted) {
     <?php endif; ?>
 
     <?php if ($examples !== []): ?>
+      <div class="print-actions">
+        <button type="button" id="btn-print">🖨 Tisk</button>
+        <button type="button" id="btn-pdf">📄 Uložit jako PDF</button>
+      </div>
       <p class="seed-info">Seed: <?= htmlspecialchars((string) $seed) ?></p>
       <ol class="examples">
         <?php foreach ($examples as $example): ?>
@@ -223,5 +235,13 @@ if ($submitted) {
 </div>
 
 <footer>Generátor příkladů — verze pro lokální testování, bez vizuálního designu.</footer>
+
+<script>
+  // Tisk i "Uložit jako PDF" jdou přes stejný tiskový dialog prohlížeče —
+  // u PDF stačí v dialogu zvolit jako tiskárnu "Uložit jako PDF".
+  // Tiskové CSS (@media print) skryje formulář, hlavičku a patičku.
+  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+  document.getElementById('btn-pdf')?.addEventListener('click', () => window.print());
+</script>
 </body>
 </html>
