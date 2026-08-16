@@ -32,6 +32,12 @@ $input = $submitted ? $_POST : [];
 
 $operatorMap = ['add' => Operator::Add, 'sub' => Operator::Sub, 'mul' => Operator::Mul, 'div' => Operator::Div];
 
+// Preset ročníku nemá na serveru žádný funkční význam — je to čistě klientská (JS)
+// pomůcka, která při výběru přednastaví skutečná pole níž (operators[], min, max, ...).
+// Ukládáme si jen kvůli "lepivosti" formuláře (aby po odeslání zůstal správný preset
+// vizuálně zvýrazněný), samotné generování se řídí výhradně těmi skutečnými poli.
+$gradePreset = $submitted ? ($input['grade_preset'] ?? '') : '';
+
 $count = max(1, min(100, readInt($input, 'count', 10)));
 $operationsCount = max(1, min(8, readInt($input, 'operations_count', 3)));
 $min = readFloat($input, 'min', -1000);
@@ -192,199 +198,502 @@ if ($submitted) {
 <html lang="cs">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Příklady na procvičování</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 0; color: #222; }
-  header, footer { background: #223; color: #fff; padding: 0.75rem 1.5rem; }
-  footer { font-size: 0.85rem; color: #ccc; }
-  .layout { display: flex; gap: 2rem; padding: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-  .form-column { flex: 0 0 320px; }
-  .results-column { flex: 1; min-width: 280px; }
-  fieldset { margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-  legend { font-weight: 600; padding: 0 0.4rem; }
-  label { display: block; margin: 0.35rem 0; }
-  .row { display: flex; gap: 0.5rem; }
-  .row label { flex: 1; }
-  input[type=number] { width: 100%; box-sizing: border-box; }
-  button { padding: 0.5rem 1.2rem; cursor: pointer; }
-  .results-column h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #555; }
-  ol.examples { font-size: 1.15rem; line-height: 2.2; }
-  .error { background: #fdd; border: 1px solid #c00; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
-  .warning { background: #ffe9b3; border: 1px solid #cc8800; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
-  .results-block { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #ccc; color: #555; }
-  .seed-rule { margin-top: 1.5rem; border: none; border-top: 1px solid #ddd; }
-  .seed-info { color: #999; font-size: 0.8rem; margin: 0.5rem 0 0; }
-  .hint { color: #777; font-size: 0.8rem; margin: 0.35rem 0 0; }
-  .print-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
-  .print-actions button { padding: 0.4rem 0.9rem; }
+  :root {
+    --board: #1c362e;
+    --board-2: #234238;
+    --board-3: #2a4d41;
+    --chalk: #f1ede4;
+    --chalk-dim: #b9c4bc;
+    --chalk-faint: #7d8f86;
+    --yellow: #e8c468;
+    --coral: #dd8a71;
+    --coral-strong: #e8785a;
+    --line: rgba(241, 237, 228, 0.16);
+    --paper: #faf8f2;
+    --paper-ink: #262b26;
+    --paper-ink-soft: #6b7269;
+    --paper-line: #d9d2bd;
+    --tape: #e8c468;
+    --error-bg: #3a2422;
+    --error-border: #a8503e;
+    --error-ink: #f3c3b6;
+    --warn-bg: #3a3320;
+    --warn-border: #b3934a;
+    --warn-ink: #f0d9a0;
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    background: var(--board);
+    color: var(--chalk);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/></svg>");
+    background-size: 140px 140px;
+  }
+
+  .shell { max-width: 1220px; margin: 0 auto; padding: 2.25rem 1.5rem 4rem; position: relative; }
+
+  header.top { margin-bottom: 1.9rem; }
+  header.top h1 { font-size: 2rem; font-weight: 800; letter-spacing: 0.01em; margin: 0 0 0.2rem; text-wrap: balance; }
+  header.top .chalk-underline { display: inline-block; width: 6.2rem; height: 5px; background: var(--coral); border-radius: 3px; margin-bottom: 0.7rem; opacity: 0.85; }
+  header.top p { margin: 0; color: var(--chalk-dim); font-size: 0.9rem; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 2.25rem; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--board-2); border: 1px solid var(--line); border-radius: 10px; padding: 1.5rem 1.5rem 1.4rem; }
+
+  .field-group { margin-bottom: 1.4rem; }
+  .field-group:last-child { margin-bottom: 0; }
+  label.field-label, legend.field-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--chalk-faint);
+    margin-bottom: 0.55rem;
+    padding: 0;
+    border: none;
+  }
+
+  fieldset.field-group { border: none; margin-left: 0; margin-right: 0; padding: 0; margin-bottom: 1.4rem; }
+
+  input[type="number"] {
+    width: 100%;
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--board);
+    color: var(--chalk);
+  }
+  input[type="number"]:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+
+  .row { display: flex; gap: 0.6rem; }
+  .row .field-group { flex: 1; margin-bottom: 0; }
+
+  /* --- operator chips --- */
+  .op-row { display: flex; gap: 0.5rem; }
+  .op-chip {
+    position: relative;
+    flex: 1;
+    text-align: center;
+    padding: 0.55rem 0;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    font-size: 1.1rem;
+    color: var(--chalk-dim);
+    cursor: pointer;
+  }
+  .op-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .op-chip:has(input:checked) { border-style: solid; border-color: var(--coral); color: var(--coral); font-weight: 700; }
+  .op-chip:has(input:focus-visible) { outline: 2px solid var(--coral); outline-offset: 1px; }
+
+  /* --- grade preset picker --- */
+  .grade-list { display: flex; flex-direction: column; gap: 0.15rem; }
+  .grade-row {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    padding: 0.5rem 0.4rem;
+    border-radius: 5px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .grade-row input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .grade-row .num { font-weight: 800; font-size: 1rem; color: var(--chalk-faint); min-width: 1.4em; }
+  .grade-row .desc { font-size: 0.8rem; color: var(--chalk-faint); }
+  .grade-row:has(input:checked) { border-left-color: var(--yellow); background: rgba(232, 196, 104, 0.08); }
+  .grade-row:has(input:checked) .num { color: var(--yellow); }
+  .grade-row:has(input:checked) .desc { color: var(--chalk); }
+  .grade-row:has(input:focus-visible) { outline: 2px solid var(--yellow); outline-offset: 1px; }
+
+  /* --- simple toggle rows --- */
+  .toggle-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--chalk-dim); margin: 0.35rem 0; }
+  .toggle-row input[type="checkbox"] { accent-color: var(--coral); }
+  .sub-toggles { display: flex; gap: 1rem; margin-top: 0.4rem; padding-left: 1.6rem; }
+  .hint { color: var(--chalk-faint); font-size: 0.76rem; margin: 0.4rem 0 0; line-height: 1.4; }
+
+  details.advanced { margin-top: 1.6rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
+  details.advanced summary { cursor: pointer; font-size: 0.83rem; color: var(--coral); font-weight: 700; list-style: none; }
+  details.advanced summary::-webkit-details-marker { display: none; }
+  details.advanced summary::before { content: "▸ "; }
+  details.advanced[open] summary::before { content: "▾ "; }
+  .advanced-body { padding-top: 1.1rem; }
+  .advanced-body h4 {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--chalk-faint); margin: 1.3rem 0 0.7rem;
+  }
+  .advanced-body h4:first-child { margin-top: 0; }
+
+  button.generate {
+    margin-top: 1.7rem;
+    width: 100%;
+    padding: 0.8rem;
+    background: var(--coral-strong);
+    color: #241310;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  button.generate:hover { filter: brightness(1.08); }
+
+  /* --- worksheet (results) --- */
+  .worksheet-wrap { position: relative; padding-top: 0.6rem; }
+  .worksheet {
+    background: var(--paper);
+    color: var(--paper-ink);
+    border-radius: 3px;
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
+    transform: rotate(-0.4deg);
+    padding: 1.6rem 1.9rem 1.9rem;
+  }
+  .tape {
+    position: absolute;
+    top: -0.7rem;
+    left: 2.4rem;
+    width: 5rem;
+    height: 1.6rem;
+    background: var(--tape);
+    opacity: 0.75;
+    transform: rotate(-3deg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  .worksheet .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .worksheet h2 { font-family: ui-serif, Georgia, serif; font-size: 1.25rem; margin: 0; }
+  .print-btn {
+    font-size: 0.78rem; color: var(--paper-ink-soft);
+    border: 1px solid var(--paper-line); border-radius: 5px;
+    padding: 0.32rem 0.65rem; cursor: pointer; background: transparent;
+  }
+  .print-btn:hover { background: rgba(0, 0, 0, 0.04); }
+
+  .placeholder-text { color: var(--paper-ink-soft); font-size: 0.95rem; }
+
+  ol.examples {
+    list-style: none;
+    counter-reset: ex;
+    margin: 0;
+    padding: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.1rem;
+    columns: 2;
+    column-gap: 2.4rem;
+  }
+  @media (max-width: 620px) { ol.examples { columns: 1; } }
+  ol.examples li { counter-increment: ex; line-height: 2.15rem; break-inside: avoid; display: flex; gap: 0.55rem; }
+  ol.examples li::before { content: counter(ex) "."; color: var(--paper-ink-soft); min-width: 1.5em; font-size: 0.92rem; }
+
+  .results-block {
+    margin-top: 1.2rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--paper-line);
+    font-size: 0.84rem;
+    color: var(--paper-ink-soft);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .results-block strong { color: var(--paper-ink); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .seed-info { margin-top: 0.55rem; font-size: 0.72rem; color: var(--paper-ink-soft); opacity: 0.8; }
+
+  .error, .warning {
+    border-radius: 8px;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  .error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-ink); }
+  .warning { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-ink); }
+
+  footer.bottom { margin-top: 2.5rem; font-size: 0.78rem; color: var(--chalk-faint); text-align: center; }
 
   @media print {
-    header, footer, .form-column, .print-actions, .warning { display: none !important; }
-    .layout { display: block; padding: 0; }
-    .results-column { width: 100%; }
+    body::before { display: none; }
+    body { background: #fff; }
+    header.top, footer.bottom, .panel, .print-btn, .warning, .tape { display: none !important; }
+    .shell { max-width: none; padding: 0; margin: 0; }
+    .layout { display: block; }
+    .worksheet-wrap { padding-top: 0; }
+    .worksheet { box-shadow: none; transform: none; border-radius: 0; padding: 0; }
   }
 </style>
 </head>
 <body>
-<header><strong>Příklady</strong> — generátor úloh na procvičování aritmetiky</header>
+<div class="shell">
+  <header class="top">
+    <h1>Příklady</h1>
+    <div class="chalk-underline"></div>
+    <p>generátor úloh na procvičování aritmetiky</p>
+  </header>
 
-<div class="layout">
-  <div class="form-column">
-    <form method="post">
-      <fieldset>
-        <legend>Malá násobilka</legend>
-        <label>
-          <input type="checkbox" name="small_multiplication_table" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
-          Generovat malou násobilku (činitelé 1–10) místo běžného zadání
-        </label>
-        <div class="row">
-          <label><input type="checkbox" name="smt_mul" <?= $smtIncludeMul ? 'checked' : '' ?>> Násobení</label>
-          <label><input type="checkbox" name="smt_div" <?= $smtIncludeDiv ? 'checked' : '' ?>> Dělení</label>
-        </div>
-        <p class="hint">Když je zaškrtnuté, přepíše nastavení operací, rozsahu a dalších jevů níž (počet příkladů a zobrazení výsledků platí i tady).</p>
-      </fieldset>
-
-      <fieldset>
-        <legend>Zadání</legend>
-        <label>Počet příkladů
-          <input type="number" name="count" value="<?= htmlspecialchars((string) $count) ?>" min="1" max="100">
-        </label>
-        <label>Počet operací na příklad
-          <input type="number" name="operations_count" value="<?= htmlspecialchars((string) $operationsCount) ?>" min="1" max="8">
-        </label>
-        <div class="row">
-          <label>Min. hodnota
-            <input type="number" name="min" value="<?= htmlspecialchars((string) $min) ?>">
+  <div class="layout">
+    <form method="post" class="panel">
+      <div class="field-group">
+        <label class="field-label" for="grade-fieldset">Ročník</label>
+        <div class="grade-list" id="grade-fieldset">
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="1" <?= $gradePreset === '1' ? 'checked' : '' ?>>
+            <span class="num">1.</span><span class="desc">sčítání a odčítání do 20</span>
           </label>
-          <label>Max. hodnota
-            <input type="number" name="max" value="<?= htmlspecialchars((string) $max) ?>">
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="2" <?= $gradePreset === '2' ? 'checked' : '' ?>>
+            <span class="num">2.</span><span class="desc">do 100, úvod do násobilky</span>
           </label>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Operace</legend>
-        <?php foreach ($operatorMap as $key => $op): ?>
-          <label>
-            <input type="checkbox" name="operators[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($op, $operators, true) ? 'checked' : '' ?>>
-            <?= htmlspecialchars($op->symbol()) ?>
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="3" <?= $gradePreset === '3' ? 'checked' : '' ?>>
+            <span class="num">3.</span><span class="desc">do 1 000, malá násobilka</span>
           </label>
-        <?php endforeach; ?>
-      </fieldset>
-
-      <fieldset>
-        <legend>Další jevy</legend>
-        <label><input type="checkbox" name="allow_negative" <?= $allowNegative ? 'checked' : '' ?>> Záporná čísla</label>
-        <label><input type="checkbox" name="allow_decimals" <?= $allowDecimals ? 'checked' : '' ?>> Desetinná čísla</label>
-        <label>Počet desetinných míst
-          <input type="number" name="decimal_places" value="<?= htmlspecialchars((string) $decimalPlaces) ?>" min="1" max="2">
-        </label>
-        <label><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
-        <label><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
-      </fieldset>
-
-      <fieldset>
-        <legend>Pokročilé</legend>
-        <label>Omezit zápisy typu "a + (-b)" / "a - (-b)" (0 % = vypnuto, 100 % = maximálně)
-          <input type="number" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10"> %
-        </label>
-        <label>Max. počet "-1" jako činitele/dělitele v jednom příkladu (víc za sebou se ruší)
-          <input type="number" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
-        </label>
-        <label>
-          <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
-          Vyrovnat zastoupení počtu cifer (jinak čistě uniformní rozsah, u širokých rozsahů silně upřednostní nejdelší čísla)
-        </label>
-        <label>Pravděpodobnost jednotlivých operátorů (0–100, normalizuje se mezi povolenými)</label>
-        <div class="row">
-          <label>+
-            <input type="number" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="4" <?= $gradePreset === '4' ? 'checked' : '' ?>>
+            <span class="num">4.</span><span class="desc">do 1 000, velká násobilka</span>
           </label>
-          <label>−
-            <input type="number" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="5" <?= $gradePreset === '5' ? 'checked' : '' ?>>
+            <span class="num">5.</span><span class="desc">+ desetinná čísla</span>
           </label>
-          <label>×
-            <input type="number" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
-          </label>
-          <label>÷
-            <input type="number" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+          <label class="grade-row">
+            <input type="radio" name="grade_preset" value="all" <?= $gradePreset === 'all' ? 'checked' : '' ?>>
+            <span class="num">＊</span><span class="desc">vše — plná nastavení</span>
           </label>
         </div>
-      </fieldset>
+        <p class="hint">Klik přednastaví rozsah, operace i další jevy níž — kdykoliv jde ručně doladit.</p>
+      </div>
 
-      <fieldset>
-        <legend>Zobrazení</legend>
-        <label><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
-        <label><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak se při každém běhu vygeneruje nový)</label>
-        <label>Seed
-          <input type="number" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
+      <div class="field-group">
+        <label class="field-label" for="f-count">Počet příkladů</label>
+        <input type="number" id="f-count" name="count" value="<?= htmlspecialchars((string) $count) ?>" min="1" max="100">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" id="ops-label">Operace</label>
+        <div class="op-row" role="group" aria-labelledby="ops-label">
+          <?php foreach ($operatorMap as $key => $op): ?>
+            <label class="op-chip">
+              <input type="checkbox" name="operators[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($op, $operators, true) ? 'checked' : '' ?>>
+              <?= htmlspecialchars($op->symbol()) ?>
+            </label>
+          <?php endforeach; ?>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="toggle-row">
+          <input type="checkbox" name="small_multiplication_table" id="f-smt" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
+          Malá násobilka (činitelé 1–10)
         </label>
-        <label><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání (pro pozdější reprodukci)</label>
-      </fieldset>
+        <div class="sub-toggles">
+          <label class="toggle-row"><input type="checkbox" name="smt_mul" <?= $smtIncludeMul ? 'checked' : '' ?>> Násobení</label>
+          <label class="toggle-row"><input type="checkbox" name="smt_div" <?= $smtIncludeDiv ? 'checked' : '' ?>> Dělení</label>
+        </div>
+        <p class="hint">Když je zaškrtnuté, přepíše nastavení rozsahu a operací výš i podrobné nastavení níž.</p>
+      </div>
 
-      <button type="submit">Vygenerovat</button>
+      <div class="field-group">
+        <label class="toggle-row"><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
+      </div>
+
+      <details class="advanced">
+        <summary>Zobrazit podrobné nastavení</summary>
+        <div class="advanced-body">
+          <h4>Zadání</h4>
+          <div class="field-group">
+            <label class="field-label" for="f-ops-count">Počet operací na příklad</label>
+            <input type="number" id="f-ops-count" name="operations_count" value="<?= htmlspecialchars((string) $operationsCount) ?>" min="1" max="8">
+          </div>
+          <div class="row">
+            <div class="field-group">
+              <label class="field-label" for="f-min">Min. hodnota</label>
+              <input type="number" id="f-min" name="min" value="<?= htmlspecialchars((string) $min) ?>">
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="f-max">Max. hodnota</label>
+              <input type="number" id="f-max" name="max" value="<?= htmlspecialchars((string) $max) ?>">
+            </div>
+          </div>
+
+          <h4>Další jevy</h4>
+          <label class="toggle-row"><input type="checkbox" name="allow_negative" <?= $allowNegative ? 'checked' : '' ?>> Záporná čísla</label>
+          <label class="toggle-row"><input type="checkbox" name="allow_decimals" <?= $allowDecimals ? 'checked' : '' ?>> Desetinná čísla</label>
+          <div class="field-group">
+            <label class="field-label" for="f-decimal-places">Počet desetinných míst</label>
+            <input type="number" id="f-decimal-places" name="decimal_places" value="<?= htmlspecialchars((string) $decimalPlaces) ?>" min="1" max="2">
+          </div>
+          <label class="toggle-row"><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
+          <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
+
+          <h4>Pokročilé</h4>
+          <div class="field-group">
+            <label class="field-label" for="f-double-neg">Omezit zápisy typu "a + (-b)" / "a - (-b)"</label>
+            <input type="number" id="f-double-neg" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="f-max-neg-one">Max. počet "-1" jako činitele/dělitele</label>
+            <input type="number" id="f-max-neg-one" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
+            Vyrovnat zastoupení počtu cifer
+          </label>
+          <div class="field-group">
+            <label class="field-label">Pravděpodobnost operátorů (0–100, normalizuje se)</label>
+            <div class="row">
+              <div class="field-group">
+                <label class="field-label" for="f-weight-add">+</label>
+                <input type="number" id="f-weight-add" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f-weight-sub">−</label>
+                <input type="number" id="f-weight-sub" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f-weight-mul">×</label>
+                <input type="number" id="f-weight-mul" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f-weight-div">÷</label>
+                <input type="number" id="f-weight-div" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+              </div>
+            </div>
+          </div>
+
+          <h4>Seed</h4>
+          <label class="toggle-row"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak nový při každém běhu)</label>
+          <div class="field-group">
+            <label class="field-label" for="f-seed">Seed</label>
+            <input type="number" id="f-seed" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
+          </div>
+          <label class="toggle-row"><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání</label>
+        </div>
+      </details>
+
+      <button type="submit" class="generate">Vygenerovat příklady</button>
     </form>
+
+    <div class="worksheet-wrap">
+      <?php if ($examples !== []): ?><div class="tape"></div><?php endif; ?>
+      <div class="worksheet">
+        <div class="head">
+          <h2>Zadání</h2>
+          <?php if ($examples !== []): ?>
+            <button type="button" class="print-btn" id="btn-print">🖨 Tisk</button>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($priorityParensWarning): ?>
+          <div class="warning">
+            Priorita operátorů je vypnutá a závorky jsou zakázané, přitom jsou zvolené operace z obou skupin
+            (+ / − i × / ÷). Generování s velkou pravděpodobností selže — zkuste povolit závorky, prioritu,
+            nebo použít operace jen z jedné skupiny.
+          </div>
+        <?php endif; ?>
+
+        <?php if ($errorMessage !== null): ?>
+          <div class="error"><?= htmlspecialchars($errorMessage) ?></div>
+        <?php endif; ?>
+
+        <?php if ($examples !== []): ?>
+          <ol class="examples">
+            <?php foreach ($examples as $example): ?>
+              <li><?= htmlspecialchars($serializer->render($example)) ?> =</li>
+            <?php endforeach; ?>
+          </ol>
+
+          <?php if ($showResults): ?>
+            <p class="results-block">
+              <strong>Výsledky:</strong>
+              <?php
+                $numbered = [];
+                foreach ($examples as $i => $example) {
+                    $numbered[] = ($i + 1) . '. ' . $serializer->renderValue($example);
+                }
+              ?>
+              <?= htmlspecialchars(implode(', ', $numbered)) ?>
+            </p>
+          <?php endif; ?>
+
+          <?php if ($includeSeedInAssignment): ?>
+            <p class="seed-info"><?= htmlspecialchars(
+                $smallMultiplicationTable ? formatSmtSummary($smtOperators, $seed) : formatConfigSummary($config, $seed)
+            ) ?></p>
+          <?php endif; ?>
+        <?php elseif ($errorMessage === null): ?>
+          <p class="placeholder-text">
+            <?= $submitted ? 'Zadání nevygenerovalo žádné příklady.' : 'Vyber vlevo ročník (nebo si zadání sestav sám) a klikni na „Vygenerovat příklady".' ?>
+          </p>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 
-  <div class="results-column">
-    <?php if ($priorityParensWarning): ?>
-      <div class="warning">
-        Priorita operátorů je vypnutá a závorky jsou zakázané, přitom jsou zvolené operace z obou skupin
-        (+ / − i × / ÷). Generování s velkou pravděpodobností selže — zkuste povolit závorky, prioritu,
-        nebo použít operace jen z jedné skupiny.
-      </div>
-    <?php endif; ?>
-
-    <?php if ($errorMessage !== null): ?>
-      <div class="error"><?= htmlspecialchars($errorMessage) ?></div>
-    <?php endif; ?>
-
-    <?php if ($examples !== []): ?>
-      <div class="print-actions">
-        <button type="button" id="btn-print">🖨 Tisk</button>
-      </div>
-      <h3>Zadání:</h3>
-      <ol class="examples">
-        <?php foreach ($examples as $example): ?>
-          <li><?= htmlspecialchars($serializer->render($example)) ?> =</li>
-        <?php endforeach; ?>
-      </ol>
-
-      <?php if ($showResults): ?>
-        <p class="results-block">
-          <strong>Výsledky:</strong>
-          <?php
-            $numbered = [];
-            foreach ($examples as $i => $example) {
-                $numbered[] = ($i + 1) . '. ' . $serializer->renderValue($example);
-            }
-          ?>
-          <?= htmlspecialchars(implode(', ', $numbered)) ?>
-        </p>
-      <?php endif; ?>
-
-      <?php if ($includeSeedInAssignment): ?>
-        <hr class="seed-rule">
-        <p class="seed-info"><?= htmlspecialchars(
-            $smallMultiplicationTable ? formatSmtSummary($smtOperators, $seed) : formatConfigSummary($config, $seed)
-        ) ?></p>
-      <?php endif; ?>
-    <?php elseif ($errorMessage !== null): ?>
-      <!-- chyba už je zobrazená výše, tady nic dalšího netřeba -->
-    <?php elseif ($submitted): ?>
-      <p>Zadání nevygenerovalo žádné příklady.</p>
-    <?php else: ?>
-      <p>Nastavte zadání vlevo a klikněte na „Vygenerovat".</p>
-    <?php endif; ?>
-  </div>
+  <footer class="bottom">Generátor příkladů — verze pro lokální testování</footer>
 </div>
 
-<footer>Generátor příkladů — verze pro lokální testování, bez vizuálního designu.</footer>
-
 <script>
-  // Tiskové CSS (@media print) skryje formulář, hlavičku a patičku —
-  // pro uložení jako PDF si uživatel v tiskovém dialogu zvolí tiskárnu "Uložit jako PDF".
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+
+  // Preset ročníku je čistě klientská pomůcka: při výběru přednastaví skutečná pole
+  // formuláře (operators[], min, max, ...). Server o presetech nic neví — vidí jen
+  // výsledné hodnoty polí, přesně jako při ručním vyplnění.
+  const GRADE_PRESETS = {
+    '1':   { operationsCount: 1, min: 0,     max: 20,   operators: ['add', 'sub'],               parentheses: false, priority: false, decimals: false, negative: false, smt: false },
+    '2':   { operationsCount: 2, min: 0,     max: 100,  operators: ['add', 'sub', 'mul', 'div'],  parentheses: true,  priority: false, decimals: false, negative: false, smt: true  },
+    '3':   { operationsCount: 3, min: 0,     max: 1000, operators: ['add', 'sub', 'mul', 'div'],  parentheses: true,  priority: true,  decimals: false, negative: false, smt: true  },
+    '4':   { operationsCount: 4, min: 0,     max: 1000, operators: ['add', 'sub', 'mul', 'div'],  parentheses: true,  priority: true,  decimals: false, negative: false, smt: false },
+    '5':   { operationsCount: 5, min: 0,     max: 1000, operators: ['add', 'sub', 'mul', 'div'],  parentheses: true,  priority: true,  decimals: true,  negative: false, smt: false },
+    'all': { operationsCount: 3, min: -1000, max: 1000, operators: ['add', 'sub', 'mul', 'div'],  parentheses: true,  priority: true,  decimals: true,  negative: true,  smt: false },
+  };
+
+  function setChecked(name, value) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) el.checked = value;
+  }
+
+  function applyGradePreset(key) {
+    const preset = GRADE_PRESETS[key];
+    if (!preset) return;
+
+    document.querySelector('[name="operations_count"]').value = preset.operationsCount;
+    document.querySelector('[name="min"]').value = preset.min;
+    document.querySelector('[name="max"]').value = preset.max;
+
+    document.querySelectorAll('[name="operators[]"]').forEach((checkbox) => {
+      checkbox.checked = preset.operators.includes(checkbox.value);
+    });
+
+    setChecked('allow_parentheses', preset.parentheses);
+    setChecked('allow_priority', preset.priority);
+    setChecked('allow_decimals', preset.decimals);
+    setChecked('allow_negative', preset.negative);
+    setChecked('small_multiplication_table', preset.smt);
+    if (preset.smt) {
+      setChecked('smt_mul', true);
+      setChecked('smt_div', true);
+    }
+  }
+
+  document.querySelectorAll('[name="grade_preset"]').forEach((radio) => {
+    radio.addEventListener('change', () => applyGradePreset(radio.value));
+  });
 </script>
 </body>
 </html>
