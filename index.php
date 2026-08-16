@@ -411,6 +411,10 @@ if ($submitted) {
   /* --- worksheet (results) --- */
   .worksheet-wrap { position: relative; padding-top: 0.6rem; }
   .worksheet {
+    position: relative; /* bez tohohle by se .tape (position:absolute) vykreslila
+      NAD papírem bez ohledu na pořadí v HTML — pozicované prvky se vždy malují
+      nad nepozicovanými. Takhle o pořadí rozhoduje pořadí v HTML (papír je za
+      páskou v kódu, takže teď správně překryje její spodní část). */
     background: var(--paper);
     color: var(--paper-ink);
     border-radius: 3px;
