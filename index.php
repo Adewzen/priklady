@@ -70,6 +70,7 @@ $includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : 
 $doubleNegativeBiasPercent = max(0, min(100, readInt($input, 'double_negative_bias', 70)));
 $maxNegativeOneFactors = max(0, min(5, readInt($input, 'max_negative_one_factors', 1)));
 $digitCountBiasEnabled = $submitted ? readBool($input, 'digit_count_bias') : true;
+$wholeNumberBiasPercent = max(0, min(100, readInt($input, 'whole_number_bias', 70)));
 
 $operatorWeightKeys = ['add' => 'weight_add', 'sub' => 'weight_sub', 'mul' => 'weight_mul', 'div' => 'weight_div'];
 $operatorWeights = [];
@@ -97,6 +98,7 @@ $config = new GeneratorConfig(
     digitCountBiasEnabled: $digitCountBiasEnabled,
     operatorWeights: $operatorWeights,
     smallMultiplicationTable: $smallMultiplicationTable,
+    wholeNumberBiasPercent: $wholeNumberBiasPercent,
 );
 
 $priorityParensWarning = $submitted
@@ -126,6 +128,9 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
         $parts[] = 'Max. počet "-1" jako činitele: ' . $config->maxNegativeOneFactors;
     }
     $parts[] = 'Bias na počet cifer: ' . ($config->digitCountBiasEnabled ? 'ano' : 'ne');
+    if ($config->allowDecimals) {
+        $parts[] = 'Bias k celým číslům: ' . $config->wholeNumberBiasPercent . ' %';
+    }
     if (count($config->operators) > 1) {
         $weights = [];
         foreach ($config->operators as $op) {
@@ -292,6 +297,11 @@ if ($submitted) {
   /* Počet desetinných míst se ukáže, jen když jsou zaškrtnutá desetinná čísla. */
   .decimals-group .decimal-places-input { display: none; margin-top: 0.6rem; }
   .decimals-group:has(input[name="allow_decimals"]:checked) .decimal-places-input { display: block; }
+
+  /* Bias k celým číslům dává smysl jen s povolenými desetinnými čísly — checkbox je
+     v jiné části formuláře, takže se to musí hlídat přes celý form. */
+  .whole-number-bias-group { display: none; }
+  form:has(input[name="allow_decimals"]:checked) .whole-number-bias-group { display: block; }
 
   /* Vstup s jednotkou "%" napravo v poli. */
   .unit-field { position: relative; }
@@ -550,6 +560,13 @@ if ($submitted) {
                 <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
                 Vyrovnat zastoupení počtu cifer
               </label>
+              <div class="field-group whole-number-bias-group">
+                <label class="field-label" for="f-whole-number-bias">Bias k celým číslům (0 % = vypnuto — pro procvičování desetinných čísel; 100 % = skoro vždy celá)</label>
+                <div class="unit-field">
+                  <input type="number" id="f-whole-number-bias" name="whole_number_bias" value="<?= htmlspecialchars((string) $wholeNumberBiasPercent) ?>" min="0" max="100" step="10">
+                  <span class="unit">%</span>
+                </div>
+              </div>
               <div class="field-group">
                 <label class="field-label">Pravděpodobnost operátorů (v %, normalizuje se mezi povolenými)</label>
                 <div class="row">

@@ -186,9 +186,75 @@ final class ExampleGenerator
     /** Náhodné číslo z rozsahu — s bias na počet cifer, nebo čistě uniformní, podle configu. */
     private function pickRangedInt(int $min, int $max): int
     {
+        if ($this->scale > 1 && $this->config->wholeNumberBiasPercent > 0) {
+            return $this->pickRangedIntWithDecimalBias($min, $max);
+        }
+
         return $this->config->digitCountBiasEnabled
             ? $this->rng->intBiasedByDigits($min, $max)
             : $this->rng->int($min, $max);
+    }
+
+    /**
+     * Stejný princip jako Rng::intBiasedByDigits() (nejdřív vyber "třídu", pak uvnitř ní
+     * uniformně/dále biasovaně), tady ale třídy nejsou "počet cifer čísla" nýbrž "počet
+     * použitých desetinných míst" — 0 (celé číslo), 1, ..., decimalPlaces. Třída 0 dostane
+     * váhu wholeNumberBiasPercent, každá další třída (100 - wholeNumberBiasPercent) —
+     * takže výchozích 70 % dá při 2 desetinných místech přibližně poměr vah 70:30:30
+     * (celé:1 místo:2 místa), ne přesně 70 % celých čísel v hotových příkladech (to se
+     * dál láme rekurzivním skládáním stromu), ale výrazně to posune zastoupení směrem
+     * k celým/kratším číslům.
+     *
+     * V rámci zvolené třídy (dané "krokem" — násobkem 10^(decimalPlaces - třída)) se
+     * konkrétní hodnota vybírá stejným bias-na-cifry mechanismem jako jinde, jen
+     * aplikovaným na "index" (hodnotu vydělenou krokem) — pro celá čísla je to přímo
+     * biasování skutečné reálné hodnoty, pro necelé třídy je to o trochu volnější
+     * analogie, ale pořád smysluplně upřednostňuje menší/kratší čísla.
+     */
+    private function pickRangedIntWithDecimalBias(int $min, int $max): int
+    {
+        $decimalPlaces = $this->config->decimalPlaces;
+        $biasPercent = $this->config->wholeNumberBiasPercent;
+
+        $levels = [];
+        for ($precision = 0; $precision <= $decimalPlaces; $precision++) {
+            $step = (int) (10 ** ($decimalPlaces - $precision));
+            $low = (int) ceil($min / $step) * $step;
+            $high = (int) floor($max / $step) * $step;
+            if ($low > $high) {
+                continue; // tahle úroveň přesnosti není v daném rozsahu vůbec dosažitelná
+            }
+            $weight = $precision === 0 ? $biasPercent : max(1, 100 - $biasPercent);
+            $levels[] = ['step' => $step, 'low' => $low, 'high' => $high, 'weight' => $weight];
+        }
+
+        if ($levels === []) {
+            // Nemělo by nastat (plná přesnost je vždy dosažitelná, když min<=max), ale
+            // pro jistotu spadneme na běžné chování.
+            return $this->config->digitCountBiasEnabled
+                ? $this->rng->intBiasedByDigits($min, $max)
+                : $this->rng->int($min, $max);
+        }
+
+        $totalWeight = array_sum(array_column($levels, 'weight'));
+        $roll = $this->rng->int(1, $totalWeight);
+        $cumulative = 0;
+        $chosen = $levels[array_key_last($levels)];
+        foreach ($levels as $level) {
+            $cumulative += $level['weight'];
+            if ($roll <= $cumulative) {
+                $chosen = $level;
+                break;
+            }
+        }
+
+        $indexLow = intdiv($chosen['low'], $chosen['step']);
+        $indexHigh = intdiv($chosen['high'], $chosen['step']);
+        $index = $this->config->digitCountBiasEnabled
+            ? $this->rng->intBiasedByDigits($indexLow, $indexHigh)
+            : $this->rng->int($indexLow, $indexHigh);
+
+        return $index * $chosen['step'];
     }
 
     /** @return array{0:int,1:int} */

@@ -107,7 +107,15 @@ final class Serializer
         $abs = abs($scaledValue);
         $whole = intdiv($abs, $scale);
         $frac = $abs % $scale;
-        $decimals = str_pad((string) $frac, $this->config->decimalPlaces, '0', STR_PAD_LEFT);
+
+        // Celé číslo (frac == 0) se píše bez čárky, ne jako "12,00". Zbytečné koncové
+        // nuly v desetinné části se ořežou ("5,30" -> "5,3"), ale ne úvodní nuly za
+        // čárkou ("5,05" musí zůstat "05", jinak by se změnila hodnota na "5,5").
+        if ($frac === 0) {
+            return "{$sign}{$whole}";
+        }
+
+        $decimals = rtrim(str_pad((string) $frac, $this->config->decimalPlaces, '0', STR_PAD_LEFT), '0');
 
         return "{$sign}{$whole},{$decimals}";
     }

@@ -40,6 +40,13 @@ final class GeneratorConfig
          * generuje normálně podle ostatních nastavení.
          */
         public readonly bool $smallMultiplicationTable = false,
+        /**
+         * Bias k celým číslům (a k méně desetinným místům obecně) u desetinných čísel —
+         * 0 = vypnuto (čistě náhodné rozložení přesnosti, přirozeně skoro nikdy celé
+         * číslo), 100 = maximální snaha o celá čísla. Viz ExampleGenerator::
+         * pickRangedIntWithDecimalBias().
+         */
+        public readonly int $wholeNumberBiasPercent = 70,
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
@@ -66,6 +73,9 @@ final class GeneratorConfig
             if ($weight < 0 || $weight > 100) {
                 throw new \InvalidArgumentException('Váha operátoru musí být 0 až 100.');
             }
+        }
+        if ($wholeNumberBiasPercent < 0 || $wholeNumberBiasPercent > 100) {
+            throw new \InvalidArgumentException('Bias k celým číslům musí být 0 až 100.');
         }
     }
 

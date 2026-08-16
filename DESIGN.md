@@ -333,3 +333,44 @@ zamítnou (`RetryExhaustedException`) a `build()` zkusí jiný operátor. U velm
 kombinací (např. `operationsCount` vysoký + jen `×`/`÷` povolené + malá násobilka
 omezení) to může zvýšit počet pokusů/pravděpodobnost timeoutu — zatím se to v praxi
 neprojevilo jako problém, ale stojí za to hlídat.
+
+## Bias k celým číslům u desetinných čísel
+
+Bez zásahu vychází z čistě uniformního losování scaled hodnoty jen `1/scale` šance na
+přesně celé číslo (např. 1 % při 2 desetinných místech) — v praxi tedy skoro každé
+číslo v příkladu mělo desetinnou část, což vypadalo nepřirozeně (viz i souvislost
+s dřívějším bugem — hodně desetinných míst = víc příležitostí pro `Rng::intBiasedByDigits`
+narazit na okrajové hodnoty).
+
+`ExampleGenerator::pickRangedIntWithDecimalBias()` řeší tohle stejným principem jako
+`Rng::intBiasedByDigits()` (nejdřív vyber "třídu", pak uvnitř ní hodnotu), jen třídy
+nejsou "počet cifer" ale "počet použitých desetinných míst" — `0` (celé číslo), `1`,
+..., `decimalPlaces`. Třída `0` dostane váhu `wholeNumberBiasPercent` (výchozí 70),
+každá další třída `100 - wholeNumberBiasPercent` — u 2 desetinných míst tedy zhruba
+poměr vah 70:30:30. Uvnitř zvolené třídy (dané "krokem" — násobkem `10^(decimalPlaces
+- třída)`) se konkrétní hodnota vybírá stejným bias-na-cifry mechanismem jako jinde,
+aplikovaným na "index" (hodnotu vydělenou krokem) — pro celá čísla je to přímo
+biasování skutečné reálné hodnoty.
+
+`GeneratorConfig::wholeNumberBiasPercent` (0–100, výchozí 70) — `0` úplně vypne tenhle
+mechanismus (spadne se na původní chování bez biasu, tedy skoro vždy desetinné číslo —
+užitečné, když chce učitel cvičit VÝHRADNĚ desetinná čísla), `100` dá skoro vždy celé
+číslo. Pole ve formuláři ("Bias k celým číslům") se zobrazí jen když jsou zaškrtnutá
+desetinná čísla (`form:has(input[name="allow_decimals"]:checked) .whole-number-bias-group`
+— checkbox a pole jsou v různých částech formuláře, proto `:has()` na úrovni `<form>`,
+ne jen lokálního rodiče).
+
+Změřeno na 300 příkladech (2 operace, rozsah -100..100, 2 desetinná místa):
+
+| bias | celá čísla | 1 des. místo | 2 des. místa |
+|---|---|---|---|
+| 0 % (vypnuto)   | 0 %  | 8 %  | 92 % |
+| 70 % (výchozí)  | 43 % | 26 % | 32 % |
+| 100 %           | 97 % | 2 %  | 1 %  |
+
+**Oprava zobrazování zároveň s tímhle:** `Serializer::formatNumber()` dřív vždy tiskla
+přesně `decimalPlaces` číslic za čárkou bez ohledu na to, kolik jich číslo skutečně
+potřebuje — celé číslo `12` se zobrazilo jako `12,00`, `5,3` jako `5,30`. Teď se celé
+číslo (zbytek po dělení scale roven 0) tiskne bez čárky vůbec, a necelá čísla mají
+oříznuté koncové nuly (`rtrim(..., '0')`) — ale ne úvodní nuly za čárkou, ty musí zůstat
+(`5,05` se nesmí zkrátit na `5,5` — jen `rtrim` z pravé strany, ne `trim` z obou).
