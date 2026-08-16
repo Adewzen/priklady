@@ -61,6 +61,7 @@ $seed = $useSeed
     ? readInt($input, 'seed', random_int(1, 1_000_000))
     : random_int(1, 1_000_000);
 $includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : true;
+$avoidDoubleNegative = $submitted ? readBool($input, 'avoid_double_negative') : true;
 
 $config = new GeneratorConfig(
     count: $count,
@@ -75,6 +76,7 @@ $config = new GeneratorConfig(
     allowOperatorPriority: $allowOperatorPriority,
     showResults: $showResults,
     seed: $seed,
+    avoidDoubleNegative: $avoidDoubleNegative,
 );
 
 $priorityParensWarning = $submitted
@@ -99,6 +101,9 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
         'Závorky: ' . ($config->allowParentheses ? 'ano' : 'ne'),
         'Priorita operátorů: ' . ($config->allowOperatorPriority ? 'ano' : 'ne'),
     ];
+    if ($config->allowNegative) {
+        $parts[] = 'Omezit dvojitá znaménka: ' . ($config->avoidDoubleNegative ? 'ano' : 'ne');
+    }
     return implode(' · ', $parts);
 }
 
@@ -191,6 +196,14 @@ if ($submitted) {
         </label>
         <label><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
         <label><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pokročilé</legend>
+        <label>
+          <input type="checkbox" name="avoid_double_negative" <?= $avoidDoubleNegative ? 'checked' : '' ?>>
+          Omezit zápisy typu "a + (-b)" / "a - (-b)"
+        </label>
       </fieldset>
 
       <fieldset>

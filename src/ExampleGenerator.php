@@ -124,7 +124,9 @@ final class ExampleGenerator
         // zápisy typu "40 + (-19)". Pár posledních pokusů rozsah uvolní, ať
         // se to nezacyklí, když je nezáporné b v daném rozsahu nedosažitelné.
         $preferredHighA = min($highA, $target);
-        $preferNonNegativeB = $this->config->allowNegative && $preferredHighA >= $lowA;
+        $preferNonNegativeB = $this->config->allowNegative
+            && $this->config->avoidDoubleNegative
+            && $preferredHighA >= $lowA;
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
@@ -155,7 +157,9 @@ final class ExampleGenerator
 
         // Preferuj b >= 0, ať se omezí ošklivé zápisy typu "40 - (-19)".
         $preferredLowB = max($lowB, 0);
-        $preferNonNegativeB = $this->config->allowNegative && $preferredLowB <= $highB;
+        $preferNonNegativeB = $this->config->allowNegative
+            && $this->config->avoidDoubleNegative
+            && $preferredLowB <= $highB;
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;

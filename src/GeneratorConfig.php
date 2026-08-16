@@ -20,6 +20,7 @@ final class GeneratorConfig
         public readonly bool $allowOperatorPriority,
         public readonly bool $showResults,
         public readonly int $seed,
+        public readonly bool $avoidDoubleNegative = true,
     ) {
         if ($operators === []) {
             throw new \InvalidArgumentException('Musí být povolen alespoň jeden operátor.');
