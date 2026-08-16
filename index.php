@@ -31,21 +31,35 @@ $input = $submitted ? $_POST : [];
 
 $operatorMap = ['add' => Operator::Add, 'sub' => Operator::Sub, 'mul' => Operator::Mul, 'div' => Operator::Div];
 
-// Preset ročníku nemá na serveru žádný funkční význam — je to čistě klientská (JS)
-// pomůcka, která při výběru přednastaví skutečná pole níž (operators[], min, max, ...).
-// Ukládáme si jen kvůli "lepivosti" formuláře (aby po odeslání zůstal správný preset
-// vizuálně zvýrazněný), samotné generování se řídí výhradně těmi skutečnými poli.
-$gradePreset = $submitted ? ($input['grade_preset'] ?? '') : '';
+// Preset ročníku nemá na serveru žádný funkční význam pro GENEROVÁNÍ — je to čistě
+// klientská (JS) pomůcka, která při výběru přednastaví skutečná pole níž (operators[],
+// min, max, ...). Na čerstvém (needeslaném) načtení stránky ale musí nějaká pole mít
+// nějakou počáteční hodnotu — místo obecných výchozích hodnot použijeme rovnou "1.
+// třídu" (GRADE_PRESETS['1'] v JS níž), ať radio i pole pod ním od začátku souhlasí,
+// a nespoléháme na to, že si uživatel preset vybere sám (nebo že to prohlížeč "uhodne"
+// při obnovení stránky — proto i autocomplete="off" na formuláři).
+$freshLoadDefaults = $submitted ? null : [
+    'operationsCount' => 1,
+    'min' => 0.0,
+    'max' => 20.0,
+    'operators' => ['add', 'sub'],
+    'negative' => false,
+    'decimals' => false,
+    'parentheses' => false,
+    'priority' => false,
+    'smt' => false,
+];
+$gradePreset = $submitted ? ($input['grade_preset'] ?? '') : '1';
 
 $count = max(1, min(100, readInt($input, 'count', 10)));
-$operationsCount = max(1, min(8, readInt($input, 'operations_count', 3)));
-$min = readFloat($input, 'min', -1000);
-$max = readFloat($input, 'max', 1000);
+$operationsCount = max(1, min(8, readInt($input, 'operations_count', $freshLoadDefaults['operationsCount'] ?? 3)));
+$min = readFloat($input, 'min', $freshLoadDefaults['min'] ?? -1000);
+$max = readFloat($input, 'max', $freshLoadDefaults['max'] ?? 1000);
 if ($min > $max) {
     [$min, $max] = [$max, $min];
 }
 
-$selectedOperatorKeys = $submitted ? ($input['operators'] ?? []) : ['add', 'sub', 'mul', 'div'];
+$selectedOperatorKeys = $submitted ? ($input['operators'] ?? []) : $freshLoadDefaults['operators'];
 $operators = [];
 foreach ($selectedOperatorKeys as $key) {
     if (isset($operatorMap[$key])) {
@@ -56,11 +70,11 @@ if ($operators === []) {
     $operators = [Operator::Add, Operator::Sub];
 }
 
-$allowNegative = readBool($input, 'allow_negative');
-$allowDecimals = readBool($input, 'allow_decimals');
+$allowNegative = $submitted ? readBool($input, 'allow_negative') : $freshLoadDefaults['negative'];
+$allowDecimals = $submitted ? readBool($input, 'allow_decimals') : $freshLoadDefaults['decimals'];
 $decimalPlaces = max(1, min(2, readInt($input, 'decimal_places', 2)));
-$allowParentheses = readBool($input, 'allow_parentheses');
-$allowOperatorPriority = readBool($input, 'allow_priority');
+$allowParentheses = $submitted ? readBool($input, 'allow_parentheses') : $freshLoadDefaults['parentheses'];
+$allowOperatorPriority = $submitted ? readBool($input, 'allow_priority') : $freshLoadDefaults['priority'];
 $showResults = readBool($input, 'show_results');
 $useSeed = readBool($input, 'use_seed');
 $seed = $useSeed
@@ -78,7 +92,7 @@ foreach ($operatorWeightKeys as $opValue => $fieldName) {
     $operatorWeights[$opValue] = max(0, min(100, readInt($input, $fieldName, 50)));
 }
 
-$smallMultiplicationTable = readBool($input, 'small_multiplication_table');
+$smallMultiplicationTable = $submitted ? readBool($input, 'small_multiplication_table') : $freshLoadDefaults['smt'];
 
 $config = new GeneratorConfig(
     count: $count,
@@ -134,7 +148,7 @@ function formatConfigSummary(GeneratorConfig $config, int $seed): string
     if (count($config->operators) > 1) {
         $weights = [];
         foreach ($config->operators as $op) {
-            $weights[] = $op->symbol() . ':' . $config->operatorWeight($op);
+            $weights[] = $op->symbol() . ':' . $config->operatorWeight($op) . ' %';
         }
         $parts[] = 'Váhy operátorů: ' . implode(', ', $weights);
     }
@@ -325,11 +339,12 @@ if ($submitted) {
 
   details.advanced.nested {
     margin-top: 1.3rem;
-    padding: 0.9rem 1rem 0.2rem;
+    padding: 0.9rem 1rem;
     background: rgba(0, 0, 0, 0.14);
     border-radius: 6px;
     border-top: none;
   }
+  details.advanced.nested[open] { padding-bottom: 0.2rem; }
   details.advanced.nested .advanced-body { padding-top: 1rem; }
 
   button.generate {
