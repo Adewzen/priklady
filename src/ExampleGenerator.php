@@ -240,6 +240,13 @@ final class ExampleGenerator
     /** a - b = target  =>  a = target + b */
     private function pickSubOperands(int $target, bool $leftIsLeaf, bool $rightIsLeaf): array
     {
+        // a - b = 0 nutně znamená a = b, ať už se b zvolí jakkoliv — vždy triviální "a - a".
+        // Bez týhle kontroly bias na počet cifer dělal z 0 jako mezivýsledku neúměrně
+        // pravděpodobný cíl, takže se "a - a" objevovalo mnohem častěji, než by mělo.
+        if ($target === 0) {
+            throw new RetryExhaustedException('Odčítání s cílovým výsledkem 0 by bylo vždy triviální (a - a).');
+        }
+
         $lowB = max($this->scaledMin, $this->scaledMin - $target);
         $highB = min($this->scaledMax, $this->scaledMax - $target);
         if ($lowB > $highB) {
@@ -334,6 +341,11 @@ final class ExampleGenerator
     {
         if ($target === 0) {
             throw new RetryExhaustedException('Podíl s cílovým výsledkem 0 zatím negenerujeme.');
+        }
+        // a / b = 1 nutně znamená a = b, ať už se b zvolí jakkoliv — vždy triviální "a ÷ a".
+        // Stejný důvod jako u odčítání s cílem 0, viz pickSubOperands.
+        if ($target === $this->scale) {
+            throw new RetryExhaustedException('Dělení s cílovým výsledkem 1 by bylo vždy triviální (a ÷ a).');
         }
 
         $scale = $this->scale;

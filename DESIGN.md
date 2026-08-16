@@ -223,6 +223,29 @@ Jde vypnout checkboxem "Vyrovnat zastoupení počtu cifer" v sekci "Pokročilé"
 (`GeneratorConfig::digitCountBiasEnabled`, výchozí zapnuto) — `ExampleGenerator::
 pickRangedInt()` pak přepíná mezi `Rng::intBiasedByDigits()` a obyčejným `Rng::int()`.
 
+**Druhá vrstva stejného bugu (uživatel to odhalil znovu i po opravě košů výše):** i po
+sloučení okrajových košů se pořád objevoval vzor `"819 - 819 + 67 - 67 + ..."` — s
+libovolnými čísly, ne jen s hraniční hodnotou rozsahu. Skutečná příčina je hlubší a je to
+vlastnost odčítání/dělení, ne bucketování: uzel `a - b` s cílovou hodnotou přesně **0**
+nutně znamená `a = b`, ať už se `b` zvolí jakkoliv (`a = target + b = 0 + b = b`) — je to
+matematicky vynucené, nejde to obejít lepším výběrem operandu. Stejně tak `a ÷ b` s cílem
+přesně **1** nutně znamená `a = b`. Bias na počet cifer dělá z `0` a `1` jako MEZIVÝSLEDKU
+(cíle libovolného vnitřního uzlu, ne jen listu) neúměrně pravděpodobnou volbu, takže se
+tenhle "vždy triviální" případ objevoval mnohem častěji, než by měl.
+
+Oprava: `pickSubOperands()` a `pickDivOperands()` teď na začátku odmítnou (vyhodí
+`RetryExhaustedException`, viz normální retry mechanismus) cíl `0`, resp. přesně `1`
+(v škálovaných jednotkách `$this->scale`) — `build()` pak pro takový cíl zkusí jiný
+operátor. Násobení podobný problém nemá (`a × b = T` nemá jedinou "vždy stejnou" dvojici
+vynucenou cílem — `2×2=4` je platná, neredukovaná dvojka mezi několika možnými rozklady
+čísla 4, ne matematicky nutný důsledek volby cíle).
+
+Ověřeno testem (300 příkladů, 4 operace, rozsah 0–1000, bias zapnutý): výskyt vzoru
+`"X - X"`/`"X ÷ X"` klesl na úroveň srovnatelnou s vypnutým biasem. Zbytková shoda stejného
+čísla NA RŮZNÝCH místech výrazu (např. `13 + 9 + 13`) není tímhle řešená — to není
+matematicky vynucené triviální rušení, jen běžná statistická shoda posílená
+koncentrací biasu na krátká čísla, a jako `5 + 5` je to pedagogicky v pořádku.
+
 ## Váhy operátorů
 
 `GeneratorConfig::operatorWeights` (pole `Operator::value => 0-100`, ve formuláři čtyři
