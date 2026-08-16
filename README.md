@@ -53,4 +53,4 @@ psané dost podrobně, ať zůstane srozumitelné i bez přímé účasti na vý
 
 ## Licence / autor
 
-© Jakub Nezveda
+© Jakub Nezveda. Licencováno pod [GNU GPL v3.0](LICENSE).

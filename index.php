@@ -737,7 +737,7 @@ if ($submitted) {
 
   <footer class="bottom">
     <p>Generátor příkladů · <a href="https://github.com/Adewzen/priklady">zdrojový kód na GitHubu</a></p>
-    <p>© <?= date('Y') ?> Jakub Nezveda · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
+    <p>© <?= date('Y') ?> Jakub Nezveda · licencováno pod <a href="https://github.com/Adewzen/priklady/blob/master/LICENSE">GNU GPL v3.0</a> · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
   </footer>
 </div>
 
