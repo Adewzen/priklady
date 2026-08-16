@@ -60,6 +60,7 @@ $useSeed = readBool($input, 'use_seed');
 $seed = $useSeed
     ? readInt($input, 'seed', random_int(1, 1_000_000))
     : random_int(1, 1_000_000);
+$includeSeedInAssignment = $submitted ? readBool($input, 'include_seed_info') : true;
 
 $config = new GeneratorConfig(
     count: $count,
@@ -84,6 +85,22 @@ $priorityParensWarning = $submitted
 $serializer = new Serializer($config);
 $examples = [];
 $errorMessage = null;
+
+function formatConfigSummary(GeneratorConfig $config, int $seed): string
+{
+    $parts = [
+        'Seed: ' . $seed,
+        'Počet příkladů: ' . $config->count,
+        'Operace na příklad: ' . $config->operationsCount,
+        'Rozsah: ' . $config->min . ' – ' . $config->max,
+        'Operátory: ' . implode(', ', array_map(fn($op) => $op->symbol(), $config->operators)),
+        'Záporná čísla: ' . ($config->allowNegative ? 'ano' : 'ne'),
+        'Desetinná čísla: ' . ($config->allowDecimals ? "ano ({$config->decimalPlaces} des. místa)" : 'ne'),
+        'Závorky: ' . ($config->allowParentheses ? 'ano' : 'ne'),
+        'Priorita operátorů: ' . ($config->allowOperatorPriority ? 'ano' : 'ne'),
+    ];
+    return implode(' · ', $parts);
+}
 
 if ($submitted) {
     try {
@@ -114,11 +131,13 @@ if ($submitted) {
   .row label { flex: 1; }
   input[type=number] { width: 100%; box-sizing: border-box; }
   button { padding: 0.5rem 1.2rem; cursor: pointer; }
+  .results-column h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #555; }
   ol.examples { font-size: 1.15rem; line-height: 2.2; }
   .error { background: #fdd; border: 1px solid #c00; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
   .warning { background: #ffe9b3; border: 1px solid #cc8800; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
-  .seed-info { color: #777; font-size: 0.85rem; margin: 0 0 0.5rem; }
   .results-block { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #ccc; color: #555; }
+  .seed-rule { margin-top: 1.5rem; border: none; border-top: 1px solid #ddd; }
+  .seed-info { color: #999; font-size: 0.8rem; margin: 0.5rem 0 0; }
   .print-actions { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
   .print-actions button { padding: 0.4rem 0.9rem; }
 
@@ -178,9 +197,10 @@ if ($submitted) {
         <legend>Zobrazení</legend>
         <label><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
         <label><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak se při každém běhu vygeneruje nový)</label>
-        <label>Seed (pro opakovatelné vygenerování stejné dávky)
+        <label>Seed
           <input type="number" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
         </label>
+        <label><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání (pro pozdější reprodukci)</label>
       </fieldset>
 
       <button type="submit">Vygenerovat</button>
@@ -203,9 +223,8 @@ if ($submitted) {
     <?php if ($examples !== []): ?>
       <div class="print-actions">
         <button type="button" id="btn-print">🖨 Tisk</button>
-        <button type="button" id="btn-pdf">📄 Uložit jako PDF</button>
       </div>
-      <p class="seed-info">Seed: <?= htmlspecialchars((string) $seed) ?></p>
+      <h3>Zadání:</h3>
       <ol class="examples">
         <?php foreach ($examples as $example): ?>
           <li><?= htmlspecialchars($serializer->render($example)) ?> =</li>
@@ -224,6 +243,11 @@ if ($submitted) {
           <?= htmlspecialchars(implode(', ', $numbered)) ?>
         </p>
       <?php endif; ?>
+
+      <?php if ($includeSeedInAssignment): ?>
+        <hr class="seed-rule">
+        <p class="seed-info"><?= htmlspecialchars(formatConfigSummary($config, $seed)) ?></p>
+      <?php endif; ?>
     <?php elseif ($errorMessage !== null): ?>
       <!-- chyba už je zobrazená výše, tady nic dalšího netřeba -->
     <?php elseif ($submitted): ?>
@@ -237,11 +261,9 @@ if ($submitted) {
 <footer>Generátor příkladů — verze pro lokální testování, bez vizuálního designu.</footer>
 
 <script>
-  // Tisk i "Uložit jako PDF" jdou přes stejný tiskový dialog prohlížeče —
-  // u PDF stačí v dialogu zvolit jako tiskárnu "Uložit jako PDF".
-  // Tiskové CSS (@media print) skryje formulář, hlavičku a patičku.
+  // Tiskové CSS (@media print) skryje formulář, hlavičku a patičku —
+  // pro uložení jako PDF si uživatel v tiskovém dialogu zvolí tiskárnu "Uložit jako PDF".
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
-  document.getElementById('btn-pdf')?.addEventListener('click', () => window.print());
 </script>
 </body>
 </html>
