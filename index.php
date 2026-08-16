@@ -307,7 +307,7 @@ if ($submitted) {
     border-left: 3px solid transparent;
   }
   .grade-row input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
-  .grade-row .num { font-weight: 800; font-size: 1rem; color: var(--chalk-faint); min-width: 1.4em; }
+  .grade-row .num { font-weight: 800; font-size: 0.92rem; color: var(--chalk-faint); min-width: 4.6em; }
   .grade-row .desc { font-size: 0.8rem; color: var(--chalk-faint); }
   .grade-row:has(input:checked) { border-left-color: var(--yellow); background: rgba(232, 196, 104, 0.08); }
   .grade-row:has(input:checked) .num { color: var(--yellow); }
@@ -322,6 +322,18 @@ if ($submitted) {
   /* Pole na seed se ukáže, jen když je zaškrtnuté "Zadat seed" — čistě CSS, bez JS. */
   .seed-group .seed-input { display: none; margin-top: 0.5rem; }
   .seed-group:has(input[name="use_seed"]:checked) .seed-input { display: block; }
+
+  /* Počet desetinných míst se ukáže, jen když jsou zaškrtnutá desetinná čísla. */
+  .decimals-group .decimal-places-input { display: none; margin-top: 0.6rem; }
+  .decimals-group:has(input[name="allow_decimals"]:checked) .decimal-places-input { display: block; }
+
+  /* Vstup s jednotkou "%" napravo v poli. */
+  .unit-field { position: relative; }
+  .unit-field input[type="number"] { padding-right: 2.1rem; }
+  .unit-field .unit {
+    position: absolute; right: 0.7rem; top: 50%; transform: translateY(-50%);
+    color: var(--chalk-faint); font-size: 0.85rem; pointer-events: none;
+  }
 
   details.advanced { margin-top: 1.6rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
   details.advanced summary { cursor: pointer; font-size: 0.83rem; color: var(--coral); font-weight: 700; list-style: none; }
@@ -453,33 +465,33 @@ if ($submitted) {
   </header>
 
   <div class="layout">
-    <form method="post" class="panel">
+    <form method="post" class="panel" autocomplete="off">
       <div class="field-group">
-        <label class="field-label" for="grade-fieldset">Ročník</label>
+        <label class="field-label" for="grade-fieldset">Třída</label>
         <div class="grade-list" id="grade-fieldset">
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="1" <?= $gradePreset === '1' ? 'checked' : '' ?>>
-            <span class="num">1.</span><span class="desc">sčítání a odčítání do 20</span>
+            <span class="num">1. třída</span><span class="desc">sčítání a odčítání do 20</span>
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="2" <?= $gradePreset === '2' ? 'checked' : '' ?>>
-            <span class="num">2.</span><span class="desc">do 100, úvod do násobilky</span>
+            <span class="num">2. třída</span><span class="desc">do 100, úvod do násobilky</span>
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="3" <?= $gradePreset === '3' ? 'checked' : '' ?>>
-            <span class="num">3.</span><span class="desc">do 1 000, malá násobilka</span>
+            <span class="num">3. třída</span><span class="desc">do 1 000, malá násobilka</span>
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="4" <?= $gradePreset === '4' ? 'checked' : '' ?>>
-            <span class="num">4.</span><span class="desc">do 1 000, velká násobilka</span>
+            <span class="num">4. třída</span><span class="desc">do 1 000, velká násobilka</span>
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="5" <?= $gradePreset === '5' ? 'checked' : '' ?>>
-            <span class="num">5.</span><span class="desc">+ desetinná čísla</span>
+            <span class="num">5. třída</span><span class="desc">+ desetinná čísla</span>
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="all" <?= $gradePreset === 'all' ? 'checked' : '' ?>>
-            <span class="num">＊</span><span class="desc">vše — plná nastavení</span>
+            <span class="num">Vše</span><span class="desc">plná nastavení</span>
           </label>
         </div>
         <p class="hint">Klik přednastaví rozsah, operace i další jevy níž — kdykoliv jde ručně doladit.</p>
@@ -541,10 +553,12 @@ if ($submitted) {
 
           <h4>Další jevy</h4>
           <label class="toggle-row"><input type="checkbox" name="allow_negative" <?= $allowNegative ? 'checked' : '' ?>> Záporná čísla</label>
-          <label class="toggle-row"><input type="checkbox" name="allow_decimals" <?= $allowDecimals ? 'checked' : '' ?>> Desetinná čísla</label>
-          <div class="field-group">
-            <label class="field-label" for="f-decimal-places">Počet desetinných míst</label>
-            <input type="number" id="f-decimal-places" name="decimal_places" value="<?= htmlspecialchars((string) $decimalPlaces) ?>" min="1" max="2">
+          <div class="field-group decimals-group">
+            <label class="toggle-row"><input type="checkbox" name="allow_decimals" <?= $allowDecimals ? 'checked' : '' ?>> Desetinná čísla</label>
+            <div class="decimal-places-input">
+              <label class="field-label" for="f-decimal-places">Počet desetinných míst</label>
+              <input type="number" id="f-decimal-places" name="decimal_places" value="<?= htmlspecialchars((string) $decimalPlaces) ?>" min="1" max="2">
+            </div>
           </div>
           <label class="toggle-row"><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
           <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
@@ -556,8 +570,11 @@ if ($submitted) {
             <summary>Pokročilé</summary>
             <div class="advanced-body">
               <div class="field-group">
-                <label class="field-label" for="f-double-neg">Omezit zápisy typu "a + (-b)" / "a - (-b)"</label>
-                <input type="number" id="f-double-neg" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10">
+                <label class="field-label" for="f-double-neg">Omezit zápisy typu "a + (-b)" / "a - (-b)" (v %)</label>
+                <div class="unit-field">
+                  <input type="number" id="f-double-neg" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10">
+                  <span class="unit">%</span>
+                </div>
               </div>
               <div class="field-group">
                 <label class="field-label" for="f-max-neg-one">Max. počet "-1" jako činitele/dělitele</label>
@@ -568,23 +585,35 @@ if ($submitted) {
                 Vyrovnat zastoupení počtu cifer
               </label>
               <div class="field-group">
-                <label class="field-label">Pravděpodobnost operátorů (0–100, normalizuje se)</label>
+                <label class="field-label">Pravděpodobnost operátorů (v %, normalizuje se mezi povolenými)</label>
                 <div class="row">
                   <div class="field-group">
                     <label class="field-label" for="f-weight-add">+</label>
-                    <input type="number" id="f-weight-add" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+                    <div class="unit-field">
+                      <input type="number" id="f-weight-add" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+                      <span class="unit">%</span>
+                    </div>
                   </div>
                   <div class="field-group">
                     <label class="field-label" for="f-weight-sub">−</label>
-                    <input type="number" id="f-weight-sub" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+                    <div class="unit-field">
+                      <input type="number" id="f-weight-sub" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+                      <span class="unit">%</span>
+                    </div>
                   </div>
                   <div class="field-group">
                     <label class="field-label" for="f-weight-mul">×</label>
-                    <input type="number" id="f-weight-mul" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
+                    <div class="unit-field">
+                      <input type="number" id="f-weight-mul" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
+                      <span class="unit">%</span>
+                    </div>
                   </div>
                   <div class="field-group">
                     <label class="field-label" for="f-weight-div">÷</label>
-                    <input type="number" id="f-weight-div" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+                    <div class="unit-field">
+                      <input type="number" id="f-weight-div" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+                      <span class="unit">%</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -645,7 +674,7 @@ if ($submitted) {
           <?php endif; ?>
         <?php elseif ($errorMessage === null): ?>
           <p class="placeholder-text">
-            <?= $submitted ? 'Zadání nevygenerovalo žádné příklady.' : 'Vyber vlevo ročník (nebo si zadání sestav sám) a klikni na „Vygenerovat příklady".' ?>
+            <?= $submitted ? 'Zadání nevygenerovalo žádné příklady.' : 'Vyber vlevo třídu (nebo si zadání sestav sám) a klikni na „Vygenerovat příklady".' ?>
           </p>
         <?php endif; ?>
       </div>
