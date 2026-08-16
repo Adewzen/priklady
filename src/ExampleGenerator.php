@@ -104,17 +104,19 @@ final class ExampleGenerator
                 // jinak by uzel postavený "uvnitř" levé/pravé větve nevěděl, že tenhle
                 // uzel už -1 použil, a mohl by ho použít znovu — přesně věc, které se
                 // tu snažíme zabránit. Při selhání potomků se to musí vrátit zpět.
-                $usesNegativeOne = $this->isNegativeOneFactor($operator, $a, $b);
-                if ($usesNegativeOne) {
-                    $this->negativeOneFactorsUsed++;
+                // Pozor: u násobení mohou být OBA operandy -1 naráz (např. cíl 1 → (-1)×(-1)),
+                // proto se počítá, ne jen "ano/ne".
+                $negOneCount = $this->countNegativeOneFactors($operator, $a, $b);
+                if ($negOneCount > 0) {
+                    $this->negativeOneFactorsUsed += $negOneCount;
                 }
 
                 try {
                     $left = $this->build($a, $leftBudget);
                     $right = $this->build($b, $rightBudget);
                 } catch (RetryExhaustedException $e) {
-                    if ($usesNegativeOne) {
-                        $this->negativeOneFactorsUsed--;
+                    if ($negOneCount > 0) {
+                        $this->negativeOneFactorsUsed -= $negOneCount;
                     }
                     throw $e;
                 }
@@ -159,8 +161,8 @@ final class ExampleGenerator
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
             $a = $useFullRange
-                ? $this->rng->int($lowA, $highA)
-                : $this->rng->int($lowA, $preferredHighA);
+                ? $this->rng->intBiasedByDigits($lowA, $highA)
+                : $this->rng->intBiasedByDigits($lowA, $preferredHighA);
             $b = $target - $a;
             if ($leftIsLeaf && $a === 0) {
                 continue;
@@ -192,8 +194,8 @@ final class ExampleGenerator
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
             $useFullRange = !$preferNonNegativeB || $i >= self::MAX_NODE_RETRIES - 3;
             $b = $useFullRange
-                ? $this->rng->int($lowB, $highB)
-                : $this->rng->int($preferredLowB, $highB);
+                ? $this->rng->intBiasedByDigits($lowB, $highB)
+                : $this->rng->intBiasedByDigits($preferredLowB, $highB);
             $a = $target + $b;
             if ($leftIsLeaf && $a === 0) {
                 continue;
@@ -243,7 +245,10 @@ final class ExampleGenerator
             if ($a === $scale || $b === $scale) {
                 continue;
             }
-            if (($a === -$scale || $b === -$scale) && $this->negativeOneFactorsUsed >= $this->config->maxNegativeOneFactors) {
+            // Pozor: a i b mohou být -1 naráz (cíl 1 → (-1)×(-1)), proto se počítá,
+            // ne jen "je aspoň jeden -1".
+            $negOneCount = ($a === -$scale ? 1 : 0) + ($b === -$scale ? 1 : 0);
+            if ($negOneCount > 0 && $this->negativeOneFactorsUsed + $negOneCount > $this->config->maxNegativeOneFactors) {
                 continue;
             }
             if ($leftIsLeaf && $a === 0) {
@@ -273,7 +278,7 @@ final class ExampleGenerator
         $scale = $this->scale;
 
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $b = $this->rng->int($this->scaledMin, $this->scaledMax);
+            $b = $this->rng->intBiasedByDigits($this->scaledMin, $this->scaledMax);
             if ($b === 0 || $b === $scale) {
                 continue; // dělitel nesmí být 0 ani "1" (-1 povoleno, ale omezeně, viz níže)
             }
@@ -304,15 +309,16 @@ final class ExampleGenerator
     }
 
     /**
-     * Je tenhle uzel "násobení/dělení -1"? U dělení se počítá jen dělitel ($b) —
-     * "-1 ÷ 5" není triviální stejným způsobem jako "a × (-1)" nebo "a ÷ (-1)".
+     * Kolikrát tenhle uzel použije "-1" jako činitel/dělitel (0, 1, nebo u násobení
+     * i 2 — např. cíl 1 se rozloží jako (-1) × (-1), oba operandy naráz). U dělení se
+     * počítá jen dělitel ($b) — "-1 ÷ 5" není triviální stejným způsobem jako "a ÷ (-1)".
      */
-    private function isNegativeOneFactor(Operator $operator, int $a, int $b): bool
+    private function countNegativeOneFactors(Operator $operator, int $a, int $b): int
     {
         return match ($operator) {
-            Operator::Mul => $a === -$this->scale || $b === -$this->scale,
-            Operator::Div => $b === -$this->scale,
-            default => false,
+            Operator::Mul => ($a === -$this->scale ? 1 : 0) + ($b === -$this->scale ? 1 : 0),
+            Operator::Div => $b === -$this->scale ? 1 : 0,
+            default => 0,
         };
     }
 
@@ -335,7 +341,7 @@ final class ExampleGenerator
     private function randomValue(int $min, int $max, bool $allowZero): int
     {
         for ($i = 0; $i < self::MAX_NODE_RETRIES; $i++) {
-            $v = $this->rng->int($min, $max);
+            $v = $this->rng->intBiasedByDigits($min, $max);
             if ($allowZero || $v !== 0) {
                 return $v;
             }

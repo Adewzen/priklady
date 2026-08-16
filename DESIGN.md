@@ -176,6 +176,33 @@ jedna známá nepřesnost: pokud se celý tenhle uzel později zahodí kvůli se
 o úroveň výš ve stromu, čítač už se nevrací — důsledek je jen mírně konzervativnější
 chování (občas se `-1` nepoužije, i když by ještě "mohlo"), nikdy chybný výstup.
 
+**Druhý bug, odhalený vlastním testem po přidání bias na počet cifer (viz níže):** u
+násobení mohou vyjít OBA operandy uzlu jako `-1` naráz — třeba cíl `1` se dá rozložit
+jen jako `(-1) × (-1)` (jediný dělitel čísla 1 je 1 samo). Původní `isNegativeOneFactor()`
+vracela jen ano/ne, takže se to počítalo jako "1 použití", i když šlo o 2 najednou.
+Nahrazeno `countNegativeOneFactors()`, která vrací 0/1/2, a kontrola kapacity teď hlídá
+`aktuální_čítač + tenhle_uzel > limit`, ne jen `aktuální_čítač >= limit`.
+
+## Heuristika: bias na počet cifer
+
+Čistě uniformní losování z `[min, max]` dává u širokých rozsahů silně nerovnoměrné
+zastoupení — u `0..1000` vyjde jen ~1 % čísel jednociferných, ~9 % dvouciferných a ~90 %
+trojciferných (a pár desetin procenta čtyřciferných). `Rng::intBiasedByDigits()` místo
+toho nejdřív rovnoměrně vylosuje "třídu" (kombinaci znaménka a počtu cifer absolutní
+hodnoty — kladná/nula `[0,9]`, `[10,99]`, `[100,999]`, ...; záporná `[-9,-1]`, `[-99,-10]`, ...,
+každá jako samostatná položka v seznamu) a teprve uvnitř vybrané třídy losuje uniformně.
+Volá se všude, kde se vybírá číslo ze SPOJITÉHO rozsahu (`randomValue` pro kořenový cíl,
+`pickAddOperands`, `pickSubOperands`, dělitel v `pickDivOperands`) — **ne** v `pickMulOperands`,
+kde se vybírá z diskrétní množiny dělitelů cíle, ne ze spojitého intervalu; šlo by přidat
+podobným bucketováním kandidátů, zatím to nebylo potřeba.
+
+Není to dokonalé (0 spadá do stejné třídy jako 1-9, hranice tříd nejsou "kulaté" z pohledu
+uživatele) a negarantuje přesné rozložení počtu cifer u LISTŮ stromu (bias se aplikuje na
+každé rozhodnutí při stavbě stromu, ne na finální listy nezávisle) — ale změřeno na dávce
+500 příkladů (2 operace, `+`/`-`, rozsah 0–1000): 28 % jednociferných, 27 % dvouciferných,
+38 % trojciferných, 7 % čtyřciferných (počítáno včetně hraničního `1000`). Výrazně
+vyrovnanější než čistě uniformní rozdělení.
+
 ## Známé zjednodušení / TODO na příště
 
 - **Variabilní počet operací**: teď je pevný podle zadání, ne rozsah/náhoda.
