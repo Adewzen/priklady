@@ -79,18 +79,7 @@ foreach ($operatorWeightKeys as $opValue => $fieldName) {
 }
 
 $smallMultiplicationTable = readBool($input, 'small_multiplication_table');
-$smtIncludeMul = $submitted ? readBool($input, 'smt_mul') : true;
-$smtIncludeDiv = $submitted ? readBool($input, 'smt_div') : true;
-$smtOperators = [];
-if ($smtIncludeMul) {
-    $smtOperators[] = Operator::Mul;
-}
-if ($smtIncludeDiv) {
-    $smtOperators[] = Operator::Div;
-}
-if ($smtOperators === []) {
-    $smtOperators = [Operator::Mul, Operator::Div];
-}
+$smtOperators = [Operator::Mul, Operator::Div];
 
 $config = new GeneratorConfig(
     count: $count,
@@ -328,7 +317,6 @@ if ($submitted) {
   /* --- simple toggle rows --- */
   .toggle-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--chalk-dim); margin: 0.35rem 0; }
   .toggle-row input[type="checkbox"] { accent-color: var(--coral); }
-  .sub-toggles { display: flex; gap: 1rem; margin-top: 0.4rem; padding-left: 1.6rem; }
   .hint { color: var(--chalk-faint); font-size: 0.76rem; margin: 0.4rem 0 0; line-height: 1.4; }
 
   details.advanced { margin-top: 1.6rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
@@ -342,6 +330,15 @@ if ($submitted) {
     color: var(--chalk-faint); margin: 1.3rem 0 0.7rem;
   }
   .advanced-body h4:first-child { margin-top: 0; }
+
+  details.advanced.nested {
+    margin-top: 1.3rem;
+    padding: 0.9rem 1rem 0.2rem;
+    background: rgba(0, 0, 0, 0.14);
+    border-radius: 6px;
+    border-top: none;
+  }
+  details.advanced.nested .advanced-body { padding-top: 1rem; }
 
   button.generate {
     margin-top: 1.7rem;
@@ -389,6 +386,10 @@ if ($submitted) {
 
   .placeholder-text { color: var(--paper-ink-soft); font-size: 0.95rem; }
 
+  /* Jeden sloupec, "visící" odsazení: číslo zůstane vlevo, zalomený pokračovací
+     řádek se zarovná pod text (ne pod číslo) — funguje spolehlivě bez ohledu na
+     délku výrazu. Dvousloupcové zobrazení jsme zkoušeli, ale u delších příkladů
+     (víc operací, desetinná čísla) se zalamovalo nečitelně. */
   ol.examples {
     list-style: none;
     counter-reset: ex;
@@ -397,12 +398,14 @@ if ($submitted) {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-variant-numeric: tabular-nums;
     font-size: 1.1rem;
-    columns: 2;
-    column-gap: 2.4rem;
   }
-  @media (max-width: 620px) { ol.examples { columns: 1; } }
-  ol.examples li { counter-increment: ex; line-height: 2.15rem; break-inside: avoid; display: flex; gap: 0.55rem; }
-  ol.examples li::before { content: counter(ex) "."; color: var(--paper-ink-soft); min-width: 1.5em; font-size: 0.92rem; }
+  ol.examples li {
+    counter-increment: ex;
+    line-height: 1.7;
+    padding: 0.2rem 0 0.2rem 2.3em;
+    text-indent: -2.3em;
+  }
+  ol.examples li::before { content: counter(ex) "."; color: var(--paper-ink-soft); font-size: 0.92rem; margin-right: 0.5em; }
 
   .results-block {
     margin-top: 1.2rem;
@@ -485,36 +488,31 @@ if ($submitted) {
       </div>
 
       <div class="field-group">
-        <label class="field-label" id="ops-label">Operace</label>
-        <div class="op-row" role="group" aria-labelledby="ops-label">
-          <?php foreach ($operatorMap as $key => $op): ?>
-            <label class="op-chip">
-              <input type="checkbox" name="operators[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($op, $operators, true) ? 'checked' : '' ?>>
-              <?= htmlspecialchars($op->symbol()) ?>
-            </label>
-          <?php endforeach; ?>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <label class="toggle-row">
-          <input type="checkbox" name="small_multiplication_table" id="f-smt" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
-          Malá násobilka (činitelé 1–10)
-        </label>
-        <div class="sub-toggles">
-          <label class="toggle-row"><input type="checkbox" name="smt_mul" <?= $smtIncludeMul ? 'checked' : '' ?>> Násobení</label>
-          <label class="toggle-row"><input type="checkbox" name="smt_div" <?= $smtIncludeDiv ? 'checked' : '' ?>> Dělení</label>
-        </div>
-        <p class="hint">Když je zaškrtnuté, přepíše nastavení rozsahu a operací výš i podrobné nastavení níž.</p>
-      </div>
-
-      <div class="field-group">
         <label class="toggle-row"><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
       </div>
 
       <details class="advanced">
         <summary>Zobrazit podrobné nastavení</summary>
         <div class="advanced-body">
+          <h4>Operace</h4>
+          <div class="field-group">
+            <div class="op-row" role="group" aria-label="Operace">
+              <?php foreach ($operatorMap as $key => $op): ?>
+                <label class="op-chip">
+                  <input type="checkbox" name="operators[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($op, $operators, true) ? 'checked' : '' ?>>
+                  <?= htmlspecialchars($op->symbol()) ?>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="toggle-row">
+              <input type="checkbox" name="small_multiplication_table" id="f-smt" <?= $smallMultiplicationTable ? 'checked' : '' ?>>
+              Malá násobilka (činitelé 1–10, násobení i dělení)
+            </label>
+            <p class="hint">Když je zaškrtnuté, přepíše rozsah a operace výš.</p>
+          </div>
+
           <h4>Zadání</h4>
           <div class="field-group">
             <label class="field-label" for="f-ops-count">Počet operací na příklad</label>
@@ -541,41 +539,6 @@ if ($submitted) {
           <label class="toggle-row"><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
           <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
 
-          <h4>Pokročilé</h4>
-          <div class="field-group">
-            <label class="field-label" for="f-double-neg">Omezit zápisy typu "a + (-b)" / "a - (-b)"</label>
-            <input type="number" id="f-double-neg" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10">
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="f-max-neg-one">Max. počet "-1" jako činitele/dělitele</label>
-            <input type="number" id="f-max-neg-one" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
-          </div>
-          <label class="toggle-row">
-            <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
-            Vyrovnat zastoupení počtu cifer
-          </label>
-          <div class="field-group">
-            <label class="field-label">Pravděpodobnost operátorů (0–100, normalizuje se)</label>
-            <div class="row">
-              <div class="field-group">
-                <label class="field-label" for="f-weight-add">+</label>
-                <input type="number" id="f-weight-add" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="f-weight-sub">−</label>
-                <input type="number" id="f-weight-sub" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="f-weight-mul">×</label>
-                <input type="number" id="f-weight-mul" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="f-weight-div">÷</label>
-                <input type="number" id="f-weight-div" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
-              </div>
-            </div>
-          </div>
-
           <h4>Seed</h4>
           <label class="toggle-row"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak nový při každém běhu)</label>
           <div class="field-group">
@@ -583,6 +546,45 @@ if ($submitted) {
             <input type="number" id="f-seed" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
           </div>
           <label class="toggle-row"><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání</label>
+
+          <details class="advanced nested">
+            <summary>Pokročilé</summary>
+            <div class="advanced-body">
+              <div class="field-group">
+                <label class="field-label" for="f-double-neg">Omezit zápisy typu "a + (-b)" / "a - (-b)"</label>
+                <input type="number" id="f-double-neg" name="double_negative_bias" value="<?= htmlspecialchars((string) $doubleNegativeBiasPercent) ?>" min="0" max="100" step="10">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f-max-neg-one">Max. počet "-1" jako činitele/dělitele</label>
+                <input type="number" id="f-max-neg-one" name="max_negative_one_factors" value="<?= htmlspecialchars((string) $maxNegativeOneFactors) ?>" min="0" max="5">
+              </div>
+              <label class="toggle-row">
+                <input type="checkbox" name="digit_count_bias" <?= $digitCountBiasEnabled ? 'checked' : '' ?>>
+                Vyrovnat zastoupení počtu cifer
+              </label>
+              <div class="field-group">
+                <label class="field-label">Pravděpodobnost operátorů (0–100, normalizuje se)</label>
+                <div class="row">
+                  <div class="field-group">
+                    <label class="field-label" for="f-weight-add">+</label>
+                    <input type="number" id="f-weight-add" name="weight_add" value="<?= htmlspecialchars((string) $operatorWeights['add']) ?>" min="0" max="100">
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="f-weight-sub">−</label>
+                    <input type="number" id="f-weight-sub" name="weight_sub" value="<?= htmlspecialchars((string) $operatorWeights['sub']) ?>" min="0" max="100">
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="f-weight-mul">×</label>
+                    <input type="number" id="f-weight-mul" name="weight_mul" value="<?= htmlspecialchars((string) $operatorWeights['mul']) ?>" min="0" max="100">
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="f-weight-div">÷</label>
+                    <input type="number" id="f-weight-div" name="weight_div" value="<?= htmlspecialchars((string) $operatorWeights['div']) ?>" min="0" max="100">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
@@ -685,10 +687,6 @@ if ($submitted) {
     setChecked('allow_decimals', preset.decimals);
     setChecked('allow_negative', preset.negative);
     setChecked('small_multiplication_table', preset.smt);
-    if (preset.smt) {
-      setChecked('smt_mul', true);
-      setChecked('smt_div', true);
-    }
   }
 
   document.querySelectorAll('[name="grade_preset"]').forEach((radio) => {
