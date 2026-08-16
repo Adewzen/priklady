@@ -258,6 +258,11 @@ if ($submitted) {
     color: var(--chalk);
   }
   input[type="number"]:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+  /* Skrýt nativní šipky nahoru/dolů — v užších polích (např. váhy operátorů vedle sebe
+     ve čtyřech sloupcích) braly místo a hodnota se s nimi vůbec nevešla vedle "%". */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 
   .row { display: flex; gap: 0.6rem; }
   .row .field-group { flex: 1; margin-bottom: 0; }
@@ -303,6 +308,43 @@ if ($submitted) {
   .toggle-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--chalk-dim); margin: 0.35rem 0; }
   .toggle-row input[type="checkbox"] { accent-color: var(--coral); }
   .hint { color: var(--chalk-faint); font-size: 0.76rem; margin: 0.4rem 0 0; line-height: 1.4; }
+  .contents-label { display: contents; }
+
+  /* Malá "?" bublina s vysvětlením při najetí myší nebo focusu (klávesnicí). */
+  .info-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    background: var(--line);
+    color: var(--chalk-dim);
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: help;
+  }
+  .info-tip-popup {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    z-index: 20;
+    width: 230px;
+    padding: 0.65rem 0.75rem;
+    background: var(--board);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--chalk);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.45;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  }
+  .info-tip:hover .info-tip-popup,
+  .info-tip:focus .info-tip-popup,
+  .info-tip:focus-visible .info-tip-popup { display: block; }
 
   /* Pole na seed se ukáže, jen když je zaškrtnuté "Zadat seed" — čistě CSS, bez JS. */
   .seed-group .seed-input { display: none; margin-top: 0.5rem; }
@@ -482,10 +524,10 @@ if ($submitted) {
           </label>
           <label class="grade-row">
             <input type="radio" name="grade_preset" value="all" <?= $gradePreset === 'all' ? 'checked' : '' ?>>
-            <span class="num">Vše</span><span class="desc">plná nastavení</span>
+            <span class="num">Vše</span><span class="desc">+ záporná čísla</span>
           </label>
         </div>
-        <p class="hint">Klik přednastaví rozsah, operace i další jevy níž — kdykoliv jde ručně doladit.</p>
+        <p class="hint">Viz podrobné nastavení.</p>
       </div>
 
       <div class="field-group">
@@ -498,7 +540,12 @@ if ($submitted) {
       </div>
 
       <div class="field-group seed-group">
-        <label class="toggle-row"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Zadat seed</label>
+        <div class="toggle-row">
+          <label class="contents-label"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Zadat seed</label>
+          <span class="info-tip" tabindex="0">?
+            <span class="info-tip-popup">Seed je "semínko" pro generování — se stejným seedem a stejným zadáním dostaneš pořád stejnou sadu příkladů. Bez zaškrtnutí se při každém vygenerování vylosuje nový.</span>
+          </span>
+        </div>
         <div class="seed-input">
           <input type="number" name="seed" value="<?= htmlspecialchars((string) $seed) ?>" placeholder="Seed">
         </div>
@@ -507,9 +554,9 @@ if ($submitted) {
       <details class="advanced">
         <summary>Zobrazit podrobné nastavení</summary>
         <div class="advanced-body">
-          <h4>Operace</h4>
+          <h4>Povolené operace</h4>
           <div class="field-group">
-            <div class="op-row" role="group" aria-label="Operace">
+            <div class="op-row" role="group" aria-label="Povolené operace">
               <?php foreach ($operatorMap as $key => $op): ?>
                 <label class="op-chip">
                   <input type="checkbox" name="operators[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($op, $operators, true) ? 'checked' : '' ?>>
@@ -526,7 +573,6 @@ if ($submitted) {
             <p class="hint">Omezí jen násobení a dělení — zbytek příkladu (+, −, rozsah, počet operací, závorky) se generuje podle nastavení výš beze změny.</p>
           </div>
 
-          <h4>Zadání</h4>
           <div class="field-group">
             <label class="field-label" for="f-ops-count">Počet operací na příklad</label>
             <input type="number" id="f-ops-count" name="operations_count" value="<?= htmlspecialchars((string) $operationsCount) ?>" min="1" max="8">
@@ -544,6 +590,8 @@ if ($submitted) {
 
           <h4>Další jevy</h4>
           <label class="toggle-row"><input type="checkbox" name="allow_negative" <?= $allowNegative ? 'checked' : '' ?>> Záporná čísla</label>
+          <label class="toggle-row"><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
+          <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů</label>
           <div class="field-group decimals-group">
             <label class="toggle-row"><input type="checkbox" name="allow_decimals" <?= $allowDecimals ? 'checked' : '' ?>> Desetinná čísla</label>
             <div class="decimal-places-input">
@@ -551,8 +599,6 @@ if ($submitted) {
               <input type="number" id="f-decimal-places" name="decimal_places" value="<?= htmlspecialchars((string) $decimalPlaces) ?>" min="1" max="2">
             </div>
           </div>
-          <label class="toggle-row"><input type="checkbox" name="allow_parentheses" <?= $allowParentheses ? 'checked' : '' ?>> Závorky</label>
-          <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
 
           <h4>Seed</h4>
           <label class="toggle-row"><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání</label>
