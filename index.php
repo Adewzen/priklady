@@ -734,7 +734,7 @@ if ($submitted) {
   </div>
 
   <footer class="bottom">
-    <p>Generátor příkladů — verze pro lokální testování</p>
+    <p>Generátor příkladů</p>
     <p>© <?= date('Y') ?> Jakub Nezveda · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
   </footer>
 </div>
