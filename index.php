@@ -319,6 +319,10 @@ if ($submitted) {
   .toggle-row input[type="checkbox"] { accent-color: var(--coral); }
   .hint { color: var(--chalk-faint); font-size: 0.76rem; margin: 0.4rem 0 0; line-height: 1.4; }
 
+  /* Pole na seed se ukáže, jen když je zaškrtnuté "Zadat seed" — čistě CSS, bez JS. */
+  .seed-group .seed-input { display: none; margin-top: 0.5rem; }
+  .seed-group:has(input[name="use_seed"]:checked) .seed-input { display: block; }
+
   details.advanced { margin-top: 1.6rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
   details.advanced summary { cursor: pointer; font-size: 0.83rem; color: var(--coral); font-weight: 700; list-style: none; }
   details.advanced summary::-webkit-details-marker { display: none; }
@@ -490,6 +494,13 @@ if ($submitted) {
         <label class="toggle-row"><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
       </div>
 
+      <div class="field-group seed-group">
+        <label class="toggle-row"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Zadat seed</label>
+        <div class="seed-input">
+          <input type="number" name="seed" value="<?= htmlspecialchars((string) $seed) ?>" placeholder="Seed">
+        </div>
+      </div>
+
       <details class="advanced">
         <summary>Zobrazit podrobné nastavení</summary>
         <div class="advanced-body">
@@ -539,11 +550,6 @@ if ($submitted) {
           <label class="toggle-row"><input type="checkbox" name="allow_priority" <?= $allowOperatorPriority ? 'checked' : '' ?>> Priorita operátorů (× a ÷ před + a −)</label>
 
           <h4>Seed</h4>
-          <label class="toggle-row"><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak nový při každém běhu)</label>
-          <div class="field-group">
-            <label class="field-label" for="f-seed">Seed</label>
-            <input type="number" id="f-seed" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
-          </div>
           <label class="toggle-row"><input type="checkbox" name="include_seed_info" <?= $includeSeedInAssignment ? 'checked' : '' ?>> Zahrnout seed a konfiguraci do zadání</label>
 
           <details class="advanced nested">
