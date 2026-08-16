@@ -203,6 +203,22 @@ každé rozhodnutí při stavbě stromu, ne na finální listy nezávisle) — a
 38 % trojciferných, 7 % čtyřciferných (počítáno včetně hraničního `1000`). Výrazně
 vyrovnanější než čistě uniformní rozdělení.
 
+**Bug nahlášený uživatelem ("počet operací na příklad je rozbité"):** ve skutečnosti
+`operationsCount` fungoval správně (počet operátorů odpovídal), ale u kulatých rozsahů
+(typicky `min`/`max` přesně na mocnině deseti, např. `-1000..1000`) vznikal poslední
+dekádový koš prakticky prázdný — `[1000,1000]`, jediná hodnota — a dostával STEJNOU `1/N`
+váhu jako koš s stovkami hodnot. Číslo `1000`/`-1000` se pak losovalo ~12,5 % případů
+místo přirozených ~0,05 %, což se s vyšším `operationsCount` (víc příležitostí) projevovalo
+jako nápadně častý vzor `1000 - 1000 + ... - 1000 + ...` — vypadalo to jako by generátor
+"plýtval" operacemi na nesmyslné rušení, ne jako problém s počtem operací samotným.
+
+Oprava v `Rng::decadeBuckets()`: poslední koš se sloučí s předchozím, pokud je menší než
+1/10 jeho velikosti (např. `[1000,1000]` → sloučit do `[100,999]` → `[100,1000]`).
+Legitimně velké okrajové koše (např. `[1000,1500]` u rozsahu `-1000..1500`, 501 hodnot)
+se NEslučují — jen ty nepřiměřeně malé. Ověřeno testem: výskyt `±1000` z 20 000 losování
+klesl z 12,5 % na 0,04 % (i pod čistě uniformních ~0,10 %, což je správně — bias
+záměrně upřednostňuje kratší čísla).
+
 Jde vypnout checkboxem "Vyrovnat zastoupení počtu cifer" v sekci "Pokročilé"
 (`GeneratorConfig::digitCountBiasEnabled`, výchozí zapnuto) — `ExampleGenerator::
 pickRangedInt()` pak přepíná mezi `Rng::intBiasedByDigits()` a obyčejným `Rng::int()`.

@@ -56,23 +56,53 @@ final class Rng
     private static function digitBuckets(int $min, int $max): array
     {
         $buckets = [];
-        $bound = max(abs($min), abs($max));
 
-        // kladná strana + nula: [0,9], [10,99], [100,999], ...
-        for ($decadeLow = 0, $decadeHigh = 9; $decadeLow <= $bound; $decadeLow = $decadeHigh + 1, $decadeHigh = $decadeHigh * 10 + 9) {
-            $low = max($min, $decadeLow);
-            $high = min($max, $decadeHigh);
-            if ($low <= $high) {
-                $buckets[] = [$low, $high];
+        if ($max >= 0) {
+            foreach (self::decadeBuckets(max($min, 0), $max) as $bucket) {
+                $buckets[] = $bucket;
             }
         }
 
-        // záporná strana: [-9,-1], [-99,-10], [-999,-100], ...
-        for ($decadeLow = 1, $decadeHigh = 9; $decadeLow <= $bound; $decadeLow = $decadeHigh + 1, $decadeHigh = $decadeHigh * 10 + 9) {
-            $low = max($min, -$decadeHigh);
-            $high = min($max, -$decadeLow);
-            if ($low <= $high) {
-                $buckets[] = [$low, $high];
+        if ($min < 0) {
+            $absLow = $max < 0 ? -$max : 1;
+            $absHigh = -$min;
+            foreach (self::decadeBuckets($absLow, $absHigh) as [$low, $high]) {
+                $buckets[] = [-$high, -$low];
+            }
+        }
+
+        return $buckets;
+    }
+
+    /**
+     * Rozdělí [$low, $high] (obě strany >= 0) na dekádové koše [0,9], [10,99], [100,999], ...
+     * Poslední koš — typicky useknutý hranicí rozsahu (např. max=1000 dá koš jen s jedinou
+     * hodnotou 1000) — se sloučí s předchozím, pokud je nepřiměřeně malý (< 1/10 jeho
+     * velikosti). Bez toho by takový téměř prázdný koš dostal STEJNOU 1/N váhu jako koš
+     * s stovkami hodnot, a jeho jediná (nebo pár) hodnota by se losovala silně nadprůměrně
+     * často — přesně tenhle bug způsoboval, že se v příkladech s rozsahem do 1000
+     * neúměrně často objevovalo právě číslo 1000 (a "1000 - 1000" apod.).
+     *
+     * @return list<array{0:int,1:int}>
+     */
+    private static function decadeBuckets(int $low, int $high): array
+    {
+        $buckets = [];
+        for ($decadeLow = 0, $decadeHigh = 9; $decadeLow <= $high; $decadeLow = $decadeHigh + 1, $decadeHigh = $decadeHigh * 10 + 9) {
+            $l = max($low, $decadeLow);
+            $h = min($high, $decadeHigh);
+            if ($l <= $h) {
+                $buckets[] = [$l, $h];
+            }
+        }
+
+        $count = count($buckets);
+        if ($count >= 2) {
+            $lastSize = $buckets[$count - 1][1] - $buckets[$count - 1][0] + 1;
+            $prevSize = $buckets[$count - 2][1] - $buckets[$count - 2][0] + 1;
+            if ($lastSize * 10 < $prevSize) {
+                $buckets[$count - 2][1] = $buckets[$count - 1][1];
+                array_pop($buckets);
             }
         }
 
