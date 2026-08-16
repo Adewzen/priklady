@@ -56,7 +56,10 @@ $decimalPlaces = max(1, min(2, readInt($input, 'decimal_places', 2)));
 $allowParentheses = readBool($input, 'allow_parentheses');
 $allowOperatorPriority = readBool($input, 'allow_priority');
 $showResults = readBool($input, 'show_results');
-$seed = readInt($input, 'seed', random_int(1, 1_000_000));
+$useSeed = readBool($input, 'use_seed');
+$seed = $useSeed
+    ? readInt($input, 'seed', random_int(1, 1_000_000))
+    : random_int(1, 1_000_000);
 
 $config = new GeneratorConfig(
     count: $count,
@@ -115,6 +118,7 @@ if ($submitted) {
   .error { background: #fdd; border: 1px solid #c00; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
   .warning { background: #ffe9b3; border: 1px solid #cc8800; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
   .result { color: #555; }
+  .seed-info { color: #777; font-size: 0.85rem; margin: 0 0 0.5rem; }
 </style>
 </head>
 <body>
@@ -165,6 +169,7 @@ if ($submitted) {
       <fieldset>
         <legend>Zobrazení</legend>
         <label><input type="checkbox" name="show_results" <?= $showResults ? 'checked' : '' ?>> Zobrazit výsledky</label>
+        <label><input type="checkbox" name="use_seed" <?= $useSeed ? 'checked' : '' ?>> Použít zadaný seed (jinak se při každém běhu vygeneruje nový)</label>
         <label>Seed (pro opakovatelné vygenerování stejné dávky)
           <input type="number" name="seed" value="<?= htmlspecialchars((string) $seed) ?>">
         </label>
@@ -188,6 +193,7 @@ if ($submitted) {
     <?php endif; ?>
 
     <?php if ($examples !== []): ?>
+      <p class="seed-info">Seed: <?= htmlspecialchars((string) $seed) ?></p>
       <ol class="examples">
         <?php foreach ($examples as $example): ?>
           <li>
