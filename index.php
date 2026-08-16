@@ -117,8 +117,8 @@ if ($submitted) {
   ol.examples { font-size: 1.15rem; line-height: 2.2; }
   .error { background: #fdd; border: 1px solid #c00; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
   .warning { background: #ffe9b3; border: 1px solid #cc8800; padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; }
-  .result { color: #555; }
   .seed-info { color: #777; font-size: 0.85rem; margin: 0 0 0.5rem; }
+  .results-block { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #ccc; color: #555; }
 </style>
 </head>
 <body>
@@ -196,16 +196,16 @@ if ($submitted) {
       <p class="seed-info">Seed: <?= htmlspecialchars((string) $seed) ?></p>
       <ol class="examples">
         <?php foreach ($examples as $example): ?>
-          <li>
-            <?= htmlspecialchars($serializer->render($example)) ?> =
-            <?php if ($showResults): ?>
-              <span class="result"><?= htmlspecialchars($serializer->renderValue($example)) ?></span>
-            <?php else: ?>
-              <span class="result">&hellip;</span>
-            <?php endif; ?>
-          </li>
+          <li><?= htmlspecialchars($serializer->render($example)) ?> =</li>
         <?php endforeach; ?>
       </ol>
+
+      <?php if ($showResults): ?>
+        <p class="results-block">
+          <strong>Výsledky:</strong>
+          <?= htmlspecialchars(implode(', ', array_map(fn($e) => $serializer->renderValue($e), $examples))) ?>
+        </p>
+      <?php endif; ?>
     <?php elseif ($errorMessage !== null): ?>
       <!-- chyba už je zobrazená výše, tady nic dalšího netřeba -->
     <?php elseif ($submitted): ?>
