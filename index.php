@@ -486,6 +486,7 @@ if ($submitted) {
   .warning { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-ink); }
 
   footer.bottom { margin-top: 2.5rem; font-size: 0.78rem; color: var(--chalk-faint); text-align: center; }
+  footer.bottom p { margin: 0.25rem 0; }
 
   @media print {
     body::before { display: none; }
@@ -732,7 +733,10 @@ if ($submitted) {
     </div>
   </div>
 
-  <footer class="bottom">Generátor příkladů — verze pro lokální testování</footer>
+  <footer class="bottom">
+    <p>Generátor příkladů — verze pro lokální testování</p>
+    <p>© <?= date('Y') ?> Jakub Nezveda · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
+  </footer>
 </div>
 
 <script>
