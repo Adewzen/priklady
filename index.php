@@ -503,6 +503,21 @@ if ($submitted) {
     .layout { display: block; }
     .worksheet-wrap { padding-top: 0; }
     .worksheet { box-shadow: none; transform: none; border-radius: 0; padding: 0; }
+    /* Pod každým příkladem dvě linky na ručně dopsaný výsledek — jen v tisku,
+       na obrazovce by to místo naopak jen plýtvalo prostorem. Zarovnané pod
+       text příkladu (2.3em = stejný odsazovací "hanging indent" jako text-indent
+       výš), ne pod číslo. */
+    ol.examples li { padding-top: 0.6rem; padding-bottom: 0; }
+    ol.examples li::after {
+      content: "";
+      display: block;
+      margin-left: 2.3em;
+      height: 2.6rem;
+      background-image: linear-gradient(#999, #999), linear-gradient(#999, #999);
+      background-repeat: no-repeat, no-repeat;
+      background-position: left 1.1rem, left 2.4rem;
+      background-size: 100% 1px, 100% 1px;
+    }
   }
 </style>
 </head>
@@ -741,13 +756,24 @@ if ($submitted) {
   </div>
 
   <footer class="bottom">
-    <p>Generátor příkladů · <a href="https://github.com/Adewzen/priklady">zdrojový kód na GitHubu</a></p>
+    <p>Generátor příkladů · <a href="https://github.com/Adewzen/priklady">zdrojový kód na GitHubu</a> · <a href="#" id="contact-link" rel="nofollow">kontakt</a></p>
     <p>© <?= date('Y') ?> Jakub Nezveda · licencováno pod <a href="https://github.com/Adewzen/priklady/blob/master/LICENSE">GNU GPL v3.0</a> · obsah stránky vytvořen s pomocí AI (Claude Code)</p>
   </footer>
 </div>
 
 <script>
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+
+  // E-mail se skládá až tady, ne jako čistý text v HTML — jednoduchá obrana proti
+  // scraperům, co sbírají adresy přímo ze zdrojáku stránky (proti cílenému hledání
+  // v DevTools to nepomůže, ale to není cíl).
+  (function setupContactLink() {
+    const link = document.getElementById('contact-link');
+    if (!link) return;
+    const email = 'adewzen' + '@' + 'adewzen.cz';
+    link.href = 'mailto:' + email;
+    link.textContent = email;
+  })();
 
   // Preset ročníku je čistě klientská pomůcka: při výběru přednastaví skutečná pole
   // formuláře (operators[], min, max, ...). Server o presetech nic neví — vidí jen
